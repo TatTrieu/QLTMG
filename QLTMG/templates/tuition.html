@@ -82,7 +82,10 @@
                 </select>
                 {% endif %}
             </form>
-
+            <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                    data-bs-target="#exportModal">
+                <i class="fas fa-file-word"></i> Xuất file Word
+            </button>
             <form action="/tuition/init" method="POST" class="ml-auto">
                 <input type="hidden" name="month" value="{{ current_month }}">
                 <input type="hidden" name="class_id" value="{{ current_class_id }}">
@@ -220,6 +223,57 @@
         </div>
     </div>
 
+</div>
+
+<div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-solid fa-file-word text-primary"></i> Xuất báo cáo học phí
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form action="/export/tuition-list-word" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="month" value="{{ current_month }}">
+
+                    <input type="hidden" name="class_id" value="{{ current_class_id if current_class_id else 'all' }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Xác nhận thông tin:</label>
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                Tháng: <strong>{{ current_month }}</strong>
+                            </li>
+                            <li class="list-group-item">
+                                Lớp: <strong>
+                                {% if current_class_obj %}
+                                {{ current_class_obj.name }}
+                                {% else %}
+                                Tất cả
+                                {% endif %}
+                            </strong>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="note" class="form-label">Ghi chú thêm (tùy chọn):</label>
+                        <textarea class="form-control" name="note" rows="3"
+                                  placeholder="Ví dụ: Danh sách đã chốt sổ ngày..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-download"></i> Tải về máy
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>

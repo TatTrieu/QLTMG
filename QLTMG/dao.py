@@ -372,12 +372,11 @@ def update_user_profile(user_id, name, email, avatar=None, new_password=None):
 
 
 def stats_revenue_by_month(year=None):
-    """Thống kê doanh thu theo tháng trong năm"""
-    # Nếu không truyền năm thì lấy năm hiện tại
     if not year:
         year = datetime.now().year
 
-    return db.session.query(Receipt.month, func.sum(Receipt.amount)) \
+    # Sửa thành paid_amount (số tiền thực tế đã thu)
+    return db.session.query(Receipt.month, func.sum(Receipt.paid_amount)) \
         .filter(func.extract('year', Receipt.created_date) == year) \
         .group_by(Receipt.month) \
         .order_by(Receipt.month).all()

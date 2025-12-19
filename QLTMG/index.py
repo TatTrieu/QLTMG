@@ -12,7 +12,7 @@ from random import randint
 from flask import Blueprint, send_file
 from io import BytesIO
 from docx import Document
-from docx.shared import Pt, Inches, Cm
+from docx.shared import Pt, Inches, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dateutil.relativedelta import relativedelta
 
@@ -910,6 +910,143 @@ def export_health_list_word():
     file_stream.seek(0)
 
     filename = f"SucKhoe_{selected_class.name.replace(' ', '_')}.docx"
+
+    return send_file(
+        file_stream,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
+
+
+@app.route('/export/tuition-list-word', methods=['POST'])
+@login_required
+def export_tuition_list_word():
+    # 1. Lấy dữ liệu từ Form (Modal gửi lên)
+    month = request.form.get('month')
+    class_id = request.form.get('class_id')
+    note_content = request.form.get('note', '')
+
+    # 2. Lấy thông tin lớp
+    selected_class = ClassRoom.query.get(class_id)
+    class_name = selected_class.name if selected_class else "Tất cả"
+
+    # 3. Lấy quy định giá (để tính toán nếu chưa có hóa đơn)
+    reg_tuition = Regulation.query.filter_by(key='BASE_TUITION').first()
+    reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first()
+    base_price = reg_tuition.value if reg_tuition else 0
+    meal_price = reg_meal.value if reg_meal else 0
+
+    # 4. Lấy danh sách học sinh
+    query = Student.query.filter(Student.active == True)
+    if class_id and class_id != 'all' and class_id != '-1':
+        query = query.filter_by(class_id=class_id)
+    students = query.all()
+
+    # 5. Khởi tạo file Word
+    document = Document()
+
+    # Tiêu đề
+    p_title = document.add_heading(f'BÁO CÁO THU HỌC PHÍ - THÁNG {month}', 0)
+    p_title.alignment = 1  # Căn giữa
+
+    document.add_paragraph(f'Lớp: {class_name}')
+    document.add_paragraph(f'Ngày xuất báo cáo: {datetime.now().strftime("%d/%m/%Y")}')
+
+    # Ghi chú user nhập
+    if note_content:
+        document.add_heading('Ghi chú:', level=3)
+        p = document.add_paragraph(note_content)
+        p.italic = True
+
+    document.add_paragraph('')  # Xuống dòng
+
+    # 6. Tạo bảng dữ liệu (8 CỘT)
+    # STT | Họ tên | Học phí CB | Tiền ăn | Miễn giảm | Phải thu | Đã thu | Còn nợ
+    table = document.add_table(rows=1, cols=8)
+    table.style = 'Table Grid'
+
+    # Header
+    hdr = table.rows[0].cells
+    headers = ['STT', 'Họ tên trẻ', 'Học phí CB', 'Tiền ăn', 'Miễn giảm', 'Phải thu', 'Đã thu', 'Còn nợ']
+    for i, text in enumerate(headers):
+        hdr[i].text = text
+        # In đậm header
+        run = hdr[i].paragraphs[0].runs
+        if run: run[0].font.bold = True
+
+    # Biến tổng cộng
+    sum_total_due = 0
+    sum_paid = 0
+    sum_debt = 0
+
+    # 7. Đổ dữ liệu
+    for idx, s in enumerate(students, 1):
+        row = table.add_row().cells
+
+        # Lấy thông tin hóa đơn
+        receipt = Receipt.query.filter_by(student_id=s.id, month=month).first()
+
+        # Tính toán dữ liệu
+        if receipt:
+            r_base = base_price  # Hoặc receipt.base_tuition nếu muốn lấy lịch sử
+            r_meal = receipt.meal_total
+            r_discount = receipt.discount
+            r_due = receipt.total_due
+            r_paid = receipt.paid_amount
+        else:
+            # Nếu chưa có hóa đơn -> Tính mặc định (22 ngày)
+            default_days = 22
+            r_base = base_price
+            r_meal = default_days * meal_price
+            r_discount = 0
+            r_due = r_base + r_meal
+            r_paid = 0
+
+        r_debt = r_due - r_paid
+
+        # Cộng tổng
+        sum_total_due += r_due
+        sum_paid += r_paid
+        sum_debt += r_debt
+
+        # Định dạng tiền tệ (Thêm dấu phẩy: 1,500,000)
+        def fmt(money):
+            return "{:,.0f}".format(money)
+
+        # Ghi vào ô
+        row[0].text = str(idx)
+        row[1].text = s.name
+        row[2].text = fmt(r_base)
+        row[3].text = fmt(r_meal)
+        row[4].text = fmt(r_discount)
+        row[5].text = fmt(r_due)
+        row[6].text = fmt(r_paid)
+        row[7].text = fmt(r_debt)
+
+    # 8. Thêm dòng TỔNG CỘNG cuối bảng
+    row_sum = table.add_row().cells
+    row_sum[0].merge(row_sum[4])  # Merge từ ô 0 đến ô 4
+    row_sum[0].text = "TỔNG CỘNG:"
+    row_sum[0].paragraphs[0].runs[0].font.bold = True
+    row_sum[0].paragraphs[0].alignment = 2  # Căn phải
+
+    row_sum[5].text = "{:,.0f}".format(sum_total_due)
+    row_sum[5].paragraphs[0].runs[0].font.bold = True
+
+    row_sum[6].text = "{:,.0f}".format(sum_paid)
+    row_sum[6].paragraphs[0].runs[0].font.bold = True
+
+    row_sum[7].text = "{:,.0f}".format(sum_debt)
+    row_sum[7].paragraphs[0].runs[0].font.bold = True
+    row_sum[7].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 0, 0)
+
+    # 9. Xuất file
+    file_stream = BytesIO()
+    document.save(file_stream)
+    file_stream.seek(0)
+
+    filename = f"HocPhi_{month.replace('/', '_')}_{class_name.replace(' ', '_')}.docx"
 
     return send_file(
         file_stream,
