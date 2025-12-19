@@ -8,7 +8,8 @@ from flask_login import current_user, logout_user
 from models import User, UserRole, Student, ClassRoom, Regulation, Receipt
 # Import app và db từ package QLTMG
 from QLTMG import app, db
-import dao
+from . import dao
+
 
 
 # 1. Class cơ sở: Kiểm tra quyền Admin
