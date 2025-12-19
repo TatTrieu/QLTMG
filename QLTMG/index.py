@@ -1,6 +1,6 @@
 from flask import render_template, request, redirect, url_for, session
 from flask_login import login_user, logout_user, login_required, current_user
-from . import dao
+import dao
 from QLTMG import app, login, db
 from decorator import anonymous_required
 from models import UserRole, Student, ClassRoom, Gender, HealthRecord, Regulation, Receipt
