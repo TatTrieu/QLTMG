@@ -1,0 +1,99 @@
+{% extends 'layout/base.html' %}
+
+{% block header_title %}HỒ SƠ CÁ NHÂN{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-9">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-primary">
+                    <i class="fa-solid fa-user-shield me-2"></i> Quản lý hồ sơ
+                </h5>
+            </div>
+
+            <div class="card-body p-4">
+
+                {% if msg %}
+                <div class="alert alert-success"><i class="fa-solid fa-check-circle me-2"></i> {{ msg }}</div>
+                {% endif %}
+                {% if err_msg %}
+                <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i> {{ err_msg }}</div>
+                {% endif %}
+
+                <form method="post" action="{{ url_for('profile') }}">
+                    <div class="row">
+                        <div class="col-md-4 text-center mb-4 border-end">
+                            <div class="mb-3">
+                                <img src="{{ current_user.avatar }}" class="rounded-circle img-thumbnail shadow-sm"
+                                     style="width: 150px; height: 150px; object-fit: cover;" alt="Avatar">
+                            </div>
+                            <label class="form-label fw-bold small text-secondary">Ảnh đại diện (URL)</label>
+                            <input type="text" name="avatar" class="form-control form-control-sm mb-2"
+                                   value="{{ current_user.avatar }}" placeholder="http://...">
+                        </div>
+
+                        <div class="col-md-8 ps-md-4">
+
+                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">Thông tin cơ bản</h6>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Tên hiển thị</label>
+                                <input type="text" name="name" class="form-control" value="{{ current_user.name }}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Tên đăng nhập</label>
+                                <input type="text" class="form-control bg-light" value="{{ current_user.username }}" readonly>
+                            </div>
+
+                            <h6 class="fw-bold text-uppercase text-danger mb-3 mt-4 small border-bottom pb-2">
+                                <i class="fa-solid fa-lock me-1"></i> Bảo mật (Cần xác minh)
+                            </h6>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Email liên hệ</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fa-solid fa-envelope"></i></span>
+                                    <input type="email" name="email" class="form-control"
+                                           value="{{ current_user.email if current_user.email else '' }}"
+                                           placeholder="name@example.com">
+                                </div>
+                                <div class="form-text small fst-italic">* Nhập mật khẩu cũ bên dưới nếu bạn đổi Email.</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small text-secondary">Mật khẩu mới (Nếu đổi)</label>
+                                    <input type="password" name="new_password" class="form-control" placeholder="Để trống nếu không đổi">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small text-secondary">Nhập lại mật khẩu mới</label>
+                                    <input type="password" name="confirm_password" class="form-control" placeholder="Xác nhận mật khẩu">
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning border-warning mt-2">
+                                <label class="form-label fw-bold text-dark mb-1">
+                                    <i class="fa-solid fa-key me-1"></i> Mật khẩu hiện tại
+                                </label>
+                                <input type="password" name="old_password" class="form-control border-secondary"
+                                       placeholder="Bắt buộc nhập để xác nhận thay đổi Email hoặc Mật khẩu">
+                            </div>
+
+                            <hr>
+
+                            <div class="d-flex justify-content-end gap-2">
+                                <a href="{{ url_for('index') }}" class="btn btn-light border">Hủy bỏ</a>
+                                <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm">
+                                    <i class="fa-solid fa-floppy-disk me-2"></i> Lưu Hồ Sơ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

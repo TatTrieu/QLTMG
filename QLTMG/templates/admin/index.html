@@ -1,0 +1,111 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+
+<div class="container mt-4">
+    <h3 class="text-center text-primary mb-4">DASHBOARD QUẢN TRỊ</h3>
+
+    {% if current_user.is_authenticated %}
+    <div class="alert alert-success">
+        Xin chào quản trị viên: <strong>{{ current_user.name }}</strong>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">Thống kê sĩ số</div>
+                <div class="card-body">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Lớp học</th>
+                                <th>Số lượng trẻ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in class_stats %}
+                            <tr>
+                                <td>{{ c[0] }}</td>
+                                <td>{{ c[1] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <canvas id="studentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      const ctx = document.getElementById('studentChart');
+
+      // Chuẩn bị dữ liệu từ Python
+      let labels = [];
+      let data = [];
+
+      {% for c in class_stats %}
+        labels.push('{{ c[0] }}'); // Tên lớp
+        data.push({{ c[1] }});     // Số lượng
+      {% endfor %}
+
+      new Chart(ctx, {
+        type: 'pie', // Hoặc 'bar' nếu thích biểu đồ cột
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Số lượng trẻ',
+            data: data,
+            backgroundColor: [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'Tỷ lệ phân bố học sinh' }
+            }
+        }
+      });
+    </script>
+
+    {% else %}
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            {% if err_msg %}
+            <div class="alert alert-danger">{{ err_msg }}</div>
+            {% endif %}
+            
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">ĐĂNG NHẬP QUẢN TRỊ</div>
+                <div class="card-body">
+                    <form method="post" action="/admin-login">
+                        <div class="mb-3">
+                            <label class="form-label">Tài khoản</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mật khẩu</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <button class="btn btn-danger w-100" type="submit">Đăng Nhập</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

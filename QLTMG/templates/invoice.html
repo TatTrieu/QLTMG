@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Hóa Đơn - {{ bill.student.name }}</title>
+    <style>
+        body { font-family: sans-serif; padding: 40px; }
+        .invoice-box { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 30px; box-shadow: 0 0 10px rgba(0, 0, 0, .15); }
+        .header { text-align: center; margin-bottom: 40px; }
+        .item { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .total { font-weight: bold; font-size: 20px; color: #d33; border-top: 2px solid #eee; padding-top: 10px; margin-top: 20px; display: flex; justify-content: space-between; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="invoice-box">
+        <div class="header">
+            <h1>TRƯỜNG MẦM NON ABC</h1>
+            <h3>PHIẾU THU TIỀN</h3>
+            <p>Ngày: {{ bill.created_date.strftime('%d/%m/%Y') }}</p>
+        </div>
+
+        <div class="item">
+            <span>Họ tên trẻ:</span>
+            <span>{{ bill.student.name }}</span>
+        </div>
+        <div class="item">
+            <span>Phụ huynh:</span>
+            <span>{{ bill.student.parent_name }}</span>
+        </div>
+
+        <hr>
+
+        <div class="item">
+            <span>Học phí tháng {{ bill.month }}:</span>
+            <span>{{ "{:,.0f}".format(base_price) }} đ</span>
+        </div>
+        <div class="item">
+            <span>Tiền ăn ({{ bill.meal_days }} ngày):</span>
+            <span>{{ "{:,.0f}".format(meal_price * bill.meal_days) }} đ</span>
+        </div>
+
+        <div class="total">
+            <span>TỔNG THANH TOÁN:</span>
+            <span>{{ "{:,.0f}".format(bill.total_amount) }} VNĐ</span>
+        </div>
+
+        <br><br>
+        <center><i>Người thu tiền (Ký tên)</i></center>
+    </div>
+
+    <div class="no-print" style="text-align: center; margin-top: 20px;">
+        <button onclick="window.history.back()">Quay lại</button>
+    </div>
+</body>
+</html>

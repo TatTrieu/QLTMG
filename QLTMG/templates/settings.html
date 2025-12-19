@@ -1,0 +1,84 @@
+{% extends 'layout/base.html' %}
+
+{% block header_title %}CẤU HÌNH HỆ THỐNG{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow border-0">
+            <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-sliders me-2"></i> Thay Đổi Quy Định Nhà Trường</h5>
+                <span class="badge bg-danger">CHỈ DÀNH CHO ADMIN</span>
+            </div>
+
+            <div class="card-body p-4">
+
+                {% if msg %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fa-solid fa-check-circle me-2"></i> {{ msg }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                {% if err_msg %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> {{ err_msg }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('settings_process') }}">
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase text-secondary small">
+                            <i class="fa-solid fa-users-rectangle me-1"></i> Sĩ số tối đa / lớp
+                        </label>
+                        <div class="input-group">
+                            <input type="number" class="form-control fw-bold text-primary" name="max_student"
+                                   value="{{ settings.get('MAX_STUDENT', 25) }}" min="1" required>
+                            <span class="input-group-text">Học sinh</span>
+                        </div>
+                        <div class="form-text small text-muted fst-italic">
+                            * Nếu lớp đã đủ số lượng này, hệ thống sẽ chặn không cho thêm học sinh mới vào lớp.
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase text-secondary small">
+                            <i class="fa-solid fa-money-bill-wave me-1"></i> Học phí cơ bản (Tháng)
+                        </label>
+                        <div class="input-group">
+                            <input type="number" class="form-control fw-bold text-success" name="base_tuition"
+                                   value="{{ settings.get('BASE_TUITION', 1500000) }}" step="1000" required>
+                            <span class="input-group-text">VNĐ</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase text-secondary small">
+                            <i class="fa-solid fa-utensils me-1"></i> Tiền ăn (Ngày)
+                        </label>
+                        <div class="input-group">
+                            <input type="number" class="form-control fw-bold text-warning" name="meal_price"
+                                   value="{{ settings.get('MEAL_PRICE', 25000) }}" step="1000" required>
+                            <span class="input-group-text">VNĐ</span>
+                        </div>
+                        <div class="form-text small text-muted fst-italic">
+                            * Công thức tính hóa đơn: (Tiền ăn x Số ngày) + Học phí cơ bản.
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('index') }}" class="btn btn-light">Hủy bỏ</a>
+                        <button type="submit" class="btn btn-dark fw-bold px-4">
+                            <i class="fa-solid fa-floppy-disk me-2"></i> Lưu Cấu Hình
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

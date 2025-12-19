@@ -1,0 +1,106 @@
+{% extends 'layout/base.html' %}
+
+{% block header_title %}BÁO CÁO THỐNG KÊ{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">
+                <i class="fa-solid fa-venus-mars text-primary me-2"></i> Tỷ Lệ Giới Tính
+            </div>
+            <div class="card-body">
+                <canvas id="genderChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">
+                <i class="fa-solid fa-users-rectangle text-success me-2"></i> Phân Bố Học Sinh Theo Lớp
+            </div>
+            <div class="card-body">
+                <canvas id="classChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold">
+                <i class="fa-solid fa-chart-line text-warning me-2"></i> Biểu Đồ Doanh Thu Năm {{ year }}
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" style="max-height: 350px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // --- VẼ BIỂU ĐỒ GIỚI TÍNH ---
+    const genderLabels = [];
+    const genderData = [];
+    {% for g in gender_stats %}
+        genderLabels.push('{{ "Nam" if g[0].name == "MALE" else "Nữ" }}');
+        genderData.push({{ g[1] }});
+    {% endfor %}
+
+    new Chart(document.getElementById('genderChart'), {
+        type: 'pie',
+        data: {
+            labels: genderLabels,
+            datasets: [{
+                data: genderData,
+                backgroundColor: ['#36A2EB', '#FF6384']
+            }]
+        }
+    });
+
+    // --- VẼ BIỂU ĐỒ LỚP HỌC ---
+    const classLabels = [];
+    const classData = [];
+    {% for c in class_stats %}
+        classLabels.push('{{ c[0] }}');
+        classData.push({{ c[1] }});
+    {% endfor %}
+
+    new Chart(document.getElementById('classChart'), {
+        type: 'bar',
+        data: {
+            labels: classLabels,
+            datasets: [{
+                label: 'Số lượng trẻ',
+                data: classData,
+                backgroundColor: '#4BC0C0'
+            }]
+        }
+    });
+
+    // --- VẼ BIỂU ĐỒ DOANH THU ---
+    const revLabels = [];
+    const revData = [];
+    {% for r in revenue_stats %}
+        revLabels.push('Tháng {{ r[0] }}');
+        revData.push({{ r[1] }});
+    {% endfor %}
+
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: revLabels,
+            datasets: [{
+                label: 'Doanh thu (VNĐ)',
+                data: revData,
+                borderColor: '#FF9F40',
+                fill: false,
+                tension: 0.1
+            }]
+        }
+    });
+</script>
+{% endblock %}

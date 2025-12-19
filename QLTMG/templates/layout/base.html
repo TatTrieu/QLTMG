@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Quản Lý Mầm Non{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --sidebar-bg: #eef4fc;
+            --primary-color: #4379ee;
+        }
+        body {
+            background-color: #f5f6fa;
+            font-family: 'Segoe UI', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            background-color: var(--sidebar-bg);
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 1000;
+            border-right: 1px solid #dae1e7;
+            transition: all 0.3s;
+        }
+        .sidebar-brand {
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            justify-content: center;
+            text-align: center;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+        }
+        .nav-link {
+            color: #5a5c69;
+            font-weight: 500;
+            padding: 14px 25px;
+            display: flex;
+            align-items: center;
+            transition: 0.2s;
+        }
+        .nav-link i { width: 30px; text-align: center; margin-right: 5px;}
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary-color);
+            background-color: #dbeafe;
+            border-right: 4px solid var(--primary-color);
+        }
+
+        /* Main Wrapper */
+        .main-wrapper {
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+        .content-body { padding: 30px; flex: 1; }
+
+        /* Responsive Mobile */
+        @media (max-width: 768px) {
+            .sidebar { margin-left: calc(-1 * var(--sidebar-width)); }
+            .sidebar.show { margin-left: 0; }
+            .main-wrapper { margin-left: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+<nav class="sidebar collapse d-md-block" id="sidebarMenu">
+    <div class="sidebar-brand">
+        <i class="fa-solid fa-shapes fa-lg me-2"></i>
+        <div>Mầm Non<br>TBT</div>
+    </div>
+    <ul class="nav flex-column mt-2">
+        <li class="nav-item">
+            <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                <i class="fa-solid fa-table-columns"></i> Dashboard
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="{{ url_for('students') }}"
+               class="nav-link {% if request.endpoint == 'students' %}active{% endif %}">
+                <i class="fa-solid fa-children"></i> Quản lý trẻ
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="{{ url_for('health_process') }}"
+               class="nav-link {% if request.endpoint == 'health' %}active{% endif %}">
+                <i class="fa-solid fa-heart-pulse"></i> Sức khỏe
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="{{ url_for('tuition') }}" class="nav-link {% if request.endpoint == 'tuition' %}active{% endif %}">
+                <i class="fa-solid fa-file-invoice-dollar"></i> Thu học phí
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="{{ url_for('stats_process') }}" class="nav-link ...">
+                <i class="fa-solid fa-chart-pie"></i> Thống kê
+            </a>
+        </li>
+        <li class="nav-item mt-3">
+            <a href="{{ url_for('logout_process') }}" class="nav-link text-danger">
+                <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+            </a>
+        </li>
+    </ul>
+</nav>
+
+<div class="main-wrapper">
+
+    {% include 'layout/header.html' %}
+
+    <div class="content-body">
+        {% block content %}{% endblock %}
+    </div>
+
+    {% include 'layout/footer.html' %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

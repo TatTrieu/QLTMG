@@ -1,0 +1,17 @@
+[
+  {
+    "key": "MAX_STUDENT",
+    "value": 25,
+    "desc": "Sĩ số tối đa một lớp"
+  },
+  {
+    "key": "BASE_TUITION",
+    "value": 1500000,
+    "desc": "Học phí cơ bản hàng tháng"
+  },
+  {
+    "key": "MEAL_PRICE",
+    "value": 25000,
+    "desc": "Tiền ăn một ngày"
+  }
+]

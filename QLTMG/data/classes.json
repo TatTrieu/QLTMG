@@ -1,0 +1,40 @@
+[
+  {
+    "name": "Lớp Mầm (A1)",
+    "students": [
+      {
+        "name": "Nguyễn Gia Hân",
+        "birth_date": "2021-08-10",
+        "gender": "FEMALE",
+        "parent_name": "Nguyễn Triều Nguyệt",
+        "phone": "0905544780"
+      },
+      {
+        "name": "Trần Hoàng Nam",
+        "birth_date": "2021-05-20",
+        "gender": "MALE",
+        "parent_name": "Trần Văn A",
+        "phone": "0905123456"
+      },
+      {
+        "name": "Nguyễn Minh Anh",
+        "birth_date": "2021-09-10",
+        "gender": "FEMALE",
+        "parent_name": "Trần Hoàng Nam",
+        "phone": "0995544780"
+      }
+    ]
+  },
+  {
+    "name": "Lớp Chồi (B1)",
+    "students": [
+      {
+        "name": "Lê Thị B",
+        "birth_date": "2020-02-15",
+        "gender": "FEMALE",
+        "parent_name": "Lê Văn C",
+        "phone": "0912345678"
+      }
+    ]
+  }
+]

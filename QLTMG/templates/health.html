@@ -1,0 +1,272 @@
+{% extends 'layout/base.html' %}
+
+{% block header_title %}THEO DÕI SỨC KHỎE{% endblock %}
+
+{% block content %}
+{% if request.args.get('msg') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="fa-solid fa-check-circle me-2"></i> {{ request.args.get('msg') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.args.get('err_msg') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i> {{ request.args.get('err_msg') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <form action="{{ url_for('health_process') }}" method="get">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="fw-bold text-secondary text-nowrap">Lọc lớp:</label>
+
+                    <select name="class_id" class="form-select form-select-sm shadow-sm" style="width: 150px;"
+                            onchange="this.form.submit()"
+                            {% if current_user.role.name== 'TEACHER' %}disabled{% endif %}>
+
+                    <option value="">-- Tất cả --</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if current_class_id== c.id|string %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                    </select>
+
+                    <div class="input-group input-group-sm shadow-sm">
+                        <input type="text" name="kw" class="form-control" placeholder="Tìm tên trẻ..."
+                               value="{{ request.args.get('kw', '') }}">
+                        <button class="btn btn-secondary"><i class="fa-solid fa-search"></i></button>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                        data-bs-target="#exportHealthModal">
+                    <i class="fas fa-file-word"></i> Xuất Báo Cáo Sức Khỏe
+                </button>
+
+            </div>
+        </form>
+
+        {% if current_class %}
+        <div class="alert alert-info d-flex align-items-center shadow-sm mt-3 mb-0">
+            <div class="me-3 text-primary">
+                <i class="fa-solid fa-chalkboard-user fa-2x"></i>
+            </div>
+            <div>
+                <h6 class="m-0 fw-bold text-uppercase">{{ current_class.name }}</h6>
+                <div class="small text-dark">
+                    Giáo viên chủ nhiệm:
+                    {% if current_class.teacher %}
+                    <span class="fw-bold text-primary fs-6">{{ current_class.teacher.name }}</span>
+                    {% else %}
+                    <span class="text-muted fst-italic">Chưa phân công</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mt-4">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-secondary">
+                <tr>
+                    <th class="text-center ps-3">STT</th>
+                    <th class="text-center">Ảnh</th>
+
+                    <th class="ps-2">Họ tên trẻ</th>
+                    <th>Lớp</th>
+                    <th class="text-center">Chiều cao/Cân nặng</th>
+
+                    <th class="text-center text-muted border-start">Nhiệt độ cũ</th>
+                    <th class="text-center">Nhiệt độ mới</th>
+                    <th class="text-center border-end">Biến động</th>
+
+                    <th>Ghi chú</th>
+                    <th class="text-end pe-4">Tác vụ</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in stats %}
+                <tr>
+                    <td class="text-center text-muted ps-3">{{ loop.index }}</td>
+
+                    <td class="text-center">
+                        <img src="{{ item.student.avatar }}" class="rounded-circle border shadow-sm"
+                             style="width: 40px; height: 40px; object-fit: cover;" alt="Avt">
+                    </td>
+
+                    <td class="ps-2">
+                        <div class="fw-bold text-primary">{{ item.student.name }}</div>
+                    </td>
+
+                    <td><span class="badge bg-light text-dark border">{{ item.class_name }}</span></td>
+
+                    <td class="text-center small">
+                        <div>Cao: <b>{{ item.new_rec.height if item.new_rec else '-' }}</b> cm</div>
+                        <div>Nặng: <b>{{ item.new_rec.weight if item.new_rec else '-' }}</b> kg</div>
+                    </td>
+
+                    <td class="text-center text-muted border-start">
+                        {% if item.old_rec %}
+                        <div class="fw-bold">{{ item.old_rec.temperature }}°C</div>
+                        <small class="fst-italic" style="font-size: 10px">
+                            {{ item.old_rec.created_date.strftime('%d/%m') }}
+                        </small>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+
+                    <td class="text-center">
+                        {% if item.new_rec %}
+                        <span class="fs-5 fw-bold
+                                    {% if item.new_rec.temperature >= 38 %} text-danger
+                                    {% elif item.new_rec.temperature >= 37 %} text-warning
+                                    {% else %} text-success {% endif %}">
+                                    {{ item.new_rec.temperature }}°C
+                                </span>
+                        {% else %}
+                        <span class="badge bg-secondary">Chưa đo</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-center border-end">
+                        {% if item.diff_temp is not none %}
+                        {% if item.diff_temp > 0 %}
+                        <span class="badge bg-danger-subtle text-danger">
+                                        <i class="fa-solid fa-arrow-trend-up"></i> +{{ item.diff_temp }}
+                                    </span>
+                        {% elif item.diff_temp < 0 %}
+                        <span class="badge bg-success-subtle text-success">
+                                        <i class="fa-solid fa-arrow-trend-down"></i> {{ item.diff_temp }}
+                                    </span>
+                        {% else %}
+                        <span class="text-muted fw-bold">-</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+
+                    <td class="small text-muted fst-italic">
+                        {{ item.new_rec.note if item.new_rec else '' }}
+                    </td>
+
+                    <td class="text-end pe-4">
+                        <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal"
+                                data-bs-target="#modalUpdate{{ item.student.id }}">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                </tr>
+
+                <div class="modal fade" id="modalUpdate{{ item.student.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">Cập nhật: {{ item.student.name }}</h5>
+                                <button type="button" class="btn-close btn-close-white"
+                                        data-bs-dismiss="modal"></button>
+                            </div>
+                            <form action="{{ url_for('update_health_process') }}" method="post">
+                                <div class="modal-body">
+                                    <input type="hidden" name="student_id" value="{{ item.student.id }}">
+
+                                    <div class="row mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label fw-bold small">Chiều cao (cm)</label>
+                                            <input type="number" step="0.1" name="height" class="form-control"
+                                                   value="{{ item.new_rec.height if item.new_rec else '' }}">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label fw-bold small">Cân nặng (kg)</label>
+                                            <input type="number" step="0.1" name="weight" class="form-control"
+                                                   value="{{ item.new_rec.weight if item.new_rec else '' }}">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold small text-danger">Nhiệt độ (°C) (Hiện
+                                            tại)</label>
+                                        <input type="number" step="0.1" name="temperature"
+                                               class="form-control border-danger fw-bold text-danger"
+                                               value="{{ item.new_rec.temperature if item.new_rec else '' }}" required>
+                                        <div class="form-text small">Nhập nhiệt độ đo được lúc này. Số cũ sẽ tự động lưu
+                                            vào lịch sử.
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold small">Ghi chú sức khỏe</label>
+                                        <input type="text" name="note" class="form-control"
+                                               value="{{ item.new_rec.note if item.new_rec else '' }}"
+                                               placeholder="VD: Ho nhẹ, ăn ít...">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                    <button type="submit" class="btn btn-primary fw-bold">Lưu Số Liệu Mới</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-box-open fa-3x mb-3"></i><br>
+                        Không tìm thấy dữ liệu học sinh nào.
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="exportHealthModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Xuất Báo Cáo Sức Khỏe</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <form action="/export/health-list-word" method="POST">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="font-weight-bold">Chọn lớp cần in:</label>
+                        <select name="class_id" class="form-control" required>
+                            <option value="" disabled selected>-- Chọn lớp --</option>
+                            {% for c in classes %}
+                            <option value="{{ c.id }}" {% if current_class_id== c.id|string %}selected{% endif %}>
+                                {{ c.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-bold">Ghi chú đợt khám:</label>
+                        <textarea name="note" class="form-control" rows="3"
+                                  placeholder="Ví dụ: Khám sức khỏe định kỳ lần 1..."></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Hủy
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Tải về ngay
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

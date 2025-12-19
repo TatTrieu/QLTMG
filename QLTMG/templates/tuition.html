@@ -1,0 +1,248 @@
+{% extends 'layout/base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <div>
+                <h3 class="text-uppercase text-primary font-weight-bold mb-0">Thu Học Phí</h3>
+                {% if current_class_obj %}
+                <div class="text-muted mt-2" style="font-size: 1.1em;">
+                    <span class="mr-4">
+                        <i class="fas fa-chalkboard text-info"></i> Lớp:
+                        <strong class="text-dark">{{ current_class_obj.name }}</strong>
+                    </span>
+                    <span>
+                        <i class="fas fa-user-tie text-info"></i> GVCN:
+                        <strong class="text-dark">
+                            {{ current_class_obj.teacher.name if current_class_obj.teacher else 'Chưa phân công' }}
+                        </strong>
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <div class="card mb-3 bg-light border-0 shadow-sm">
+        <div class="card-body py-3 d-flex justify-content-between align-items-center">
+
+            <form method="GET" class="form-inline" id="filterForm">
+
+                <label class="mr-2 font-weight-bold">Tháng:</label>
+                <div class="input-group mr-4">
+                    <div class="input-group-prepend">
+                        <a href="{{ url_for('tuition', month=prev_month, class_id=current_class_id) }}"
+                           class="btn btn-outline-secondary" title="Tháng trước">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </div>
+
+                    <select name="month" class="form-control font-weight-bold text-primary text-center"
+                            style="width: 130px; appearance: none;"
+                            onchange="this.form.submit()">
+
+                        {% for m in month_list %}
+                        <option value="{{ m }}" {% if current_month== m %}selected{% endif %}>
+                            {{ m }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+
+                    <div class="input-group-append">
+                        <a href="{{ url_for('tuition', month=next_month, class_id=current_class_id) }}"
+                           class="btn btn-outline-secondary" title="Tháng sau">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <label class="mr-2 font-weight-bold">Lớp:</label>
+                {% if current_user.role.name == 'TEACHER' %}
+                <select class="form-control" disabled
+                        style="background-color: #e9ecef; color: #495057; font-weight: bold; width: 200px;">
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if current_class_id== c.id|string %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="class_id" value="{{ current_class_id }}">
+                {% else %}
+                <select name="class_id" class="form-control" onchange="this.form.submit()" style="width: 200px;">
+                    <option value="all">-- Tất cả --</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if current_class_id== c.id|string %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </form>
+
+            <form action="/tuition/init" method="POST" class="ml-auto">
+                <input type="hidden" name="month" value="{{ current_month }}">
+                <input type="hidden" name="class_id" value="{{ current_class_id }}">
+
+                <button type="submit" class="btn btn-success shadow-sm font-weight-bold"
+                        onclick="return confirm('Bạn có chắc muốn tạo dữ liệu cho tháng {{ current_month }} không?');">
+                    <i class="fas fa-plus-circle"></i> Tạo dữ liệu tháng {{ current_month }}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow mb-5">
+        <div class="card-body p-0">
+            <table class="table table-bordered table-hover mb-0 text-center align-middle">
+                <thead class="bg-primary text-white">
+                <tr>
+                    <th style="width: 50px;">STT</th>
+                    <th class="text-left">Họ tên trẻ</th>
+                    <th>Học phí CB</th>
+                    <th>Tiền ăn</th>
+                    <th>Miễn giảm</th>
+                    <th>Phải thu</th>
+                    <th>Đã thu</th>
+                    <th>Còn nợ</th>
+                    <th>Tác vụ</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if data_list %}
+                {% for item in data_list %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="text-left font-weight-bold text-dark">{{ item.name }}</td>
+                    <td>{{ "{:,.0f}".format(item.base_tuition).replace(',', '.') }}</td>
+
+                    <td>
+                        {{ "{:,.0f}".format(item.meal_total).replace(',', '.') }}
+                        <br><small class="text-muted">({{ item.meal_days }} ngày)</small>
+                    </td>
+
+                    <td>{{ "{:,.0f}".format(item.discount).replace(',', '.') }}</td>
+
+                    <td class="font-weight-bold text-primary">
+                        {{ "{:,.0f}".format(item.total_due).replace(',', '.') }}
+                    </td>
+
+                    <td class="font-weight-bold text-success">
+                        {{ "{:,.0f}".format(item.paid_amount).replace(',', '.') }}
+                    </td>
+
+                    <td>
+                        {% if item.debt > 0 %}
+                        <span class="text-danger font-weight-bold">{{ "{:,.0f}".format(item.debt).replace(',', '.') }}</span>
+                        {% else %}
+                        <i class="fas fa-check-circle text-success"></i>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <button type="button"
+                                class="btn btn-warning btn-sm text-dark font-weight-bold shadow-sm btn-update"
+
+                                data-toggle="modal" data-bs-toggle="modal"
+                                data-target="#tuitionModal" data-bs-target="#tuitionModal"
+
+                                data-id="{{ item.student_id }}"
+                                data-name="{{ item.name }}"
+                                data-days="{{ item.meal_days }}"
+                                data-discount="{{ item.discount }}"
+                                data-paid="{{ item.paid_amount }}">
+                            <i class="fas fa-edit"></i> Cập nhật
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+
+                <tr class="bg-light font-weight-bold" style="font-size: 1.1em; border-top: 2px solid #999;">
+                    <td colspan="3" class="text-right">TỔNG CỘNG:</td>
+                    <td>{{ "{:,.0f}".format(total.meal_total).replace(',', '.') }}</td>
+                    <td>{{ "{:,.0f}".format(total.discount).replace(',', '.') }}</td>
+                    <td class="text-primary">{{ "{:,.0f}".format(total.total_due).replace(',', '.') }}</td>
+                    <td class="text-success">{{ "{:,.0f}".format(total.paid).replace(',', '.') }}</td>
+                    <td class="text-danger">{{ "{:,.0f}".format(total.debt).replace(',', '.') }}</td>
+                    <td></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">Không có dữ liệu hiển thị.</td>
+                </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="tuitionModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header font-weight-bold text-dark" style="background-color: #ffc107;">
+                    <h5 class="modal-title">Cập nhật: <span id="modalTitleName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <form action="/tuition/update-single" method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="student_id" id="modalStudentId">
+                        <input type="hidden" name="month" value="{{ current_month }}">
+
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label class="font-weight-bold">Số ngày ăn:</label>
+                                <input type="number" name="meal_days" id="modalDays" class="form-control" required>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label class="font-weight-bold">Miễn giảm (VNĐ):</label>
+                                <input type="number" name="discount" id="modalDiscount" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="font-weight-bold text-success">Số tiền đã đóng (VNĐ):</label>
+                            <input type="number" name="paid_amount" id="modalPaid"
+                                   class="form-control border-success text-success font-weight-bold"
+                                   style="font-size: 1.2em;">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Hủy
+                        </button>
+                        <button type="submit" class="btn btn-primary">Lưu Số Liệu Mới</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const buttons = document.querySelectorAll('.btn-update');
+
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Lấy dữ liệu từ nút bấm
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                const days = this.getAttribute('data-days');
+                const discount = this.getAttribute('data-discount');
+                const paid = this.getAttribute('data-paid');
+
+                // Điền vào Modal
+                document.getElementById('modalStudentId').value = id;
+                document.getElementById('modalTitleName').innerText = name;
+                document.getElementById('modalDays').value = days;
+                document.getElementById('modalDiscount').value = discount;
+                document.getElementById('modalPaid').value = paid;
+            });
+        });
+    });
+</script>
+{% endblock %}

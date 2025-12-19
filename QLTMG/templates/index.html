@@ -1,0 +1,169 @@
+{% extends 'layout/base.html' %}
+
+{% block header_title %}BẢNG TIN NHÀ TRƯỜNG{% endblock %}
+
+{% block content %}
+<div class="row">
+
+    <div class="col-md-5 mb-4">
+        <div class="mb-2 shadow-sm rounded overflow-hidden">
+            <img src="{{ url_for('static', filename='images/logo.png') }}"
+                 alt="Hình ảnh trường mầm non"
+                 class="img-fluid w-100 "
+                 style="object-fit: content; height: 100%; width: 100%;">
+        </div>
+        <div class="card shadow-sm border-0 mb-2">
+            <div class="card-header bg-primary text-white fw-bold d-flex align-items-center">
+                <i class="fa-solid fa-school me-2"></i> THÔNG TIN CHUNG
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <span class="text-secondary fw-bold"><i class="fa-solid fa-users text-primary me-2"></i> Học sinh đang học</span>
+                        <span class="badge bg-primary rounded-pill fs-6">{{ count_student }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <span class="text-secondary fw-bold"><i
+                                class="fa-solid fa-chalkboard-user text-success me-2"></i> Tổng số lớp học</span>
+                        <span class="badge bg-success rounded-pill fs-6">{{ count_class }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <span class="text-secondary fw-bold"><i class="fa-solid fa-user-tie text-info me-2"></i> Hiệu trưởng</span>
+                        <span class="fw-bold text-dark">Triệu Bảo Trường</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <span class="text-secondary fw-bold"><i class="fa-solid fa-phone text-danger me-2"></i> Hotline liên hệ</span>
+                        <a href="tel:0905123456" class="fw-bold text-decoration-none text-dark">0905.123.456</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card text-white shadow mb-4 border-0" style="background-color: rgb(248, 249, 250);">
+            <div class="card-body text-center p-4">
+                <h6 class="text-uppercase text-dark fw-bold mb-3 ls-1">Thời gian hiện tại</h6>
+
+                <div id="clock" class="display-4 fw-bold mb-2 text-dark">00:00:00</div>
+
+                <div id="date" class="fs-5 text-dark opacity-75">Đang tải...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+
+        {% if request.args.get('err_msg') %}
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i> {{ request.args.get('err_msg') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+                <h5 class="m-0 fw-bold text-danger">
+                    <i class="fa-solid fa-bullhorn me-2"></i> THÔNG BÁO MỚI
+                </h5>
+
+                {% if current_user.role.name == 'ADMIN' %}
+                <button class="btn btn-sm btn-danger fw-bold shadow-sm px-3" data-bs-toggle="modal"
+                        data-bs-target="#addNotifyModal">
+                    <i class="fa-solid fa-pen-nib me-1"></i> Đăng tin
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="card-body p-0 bg-light" style="height: 450px; overflow-y: auto;">
+                <div class="list-group list-group-flush">
+                    {% for n in notifications %}
+                    <div class="list-group-item p-4 border-bottom bg-white mb-1">
+                        <div class="d-flex w-100 justify-content-between align-items-start">
+                            <div class="me-3">
+                                <h5 class="mb-1 fw-bold text-primary">{{ n.title }}</h5>
+                                <div class="text-muted small fst-italic mb-2">
+                                    <i class="fa-regular fa-clock me-1"></i> {{ n.created_date.strftime('%H:%M -
+                                    %d/%m/%Y') }}
+                                </div>
+                            </div>
+
+                            {% if current_user.role.name == 'ADMIN' %}
+                            <a href="{{ url_for('delete_notification', id=n.id) }}"
+                               class="btn btn-outline-secondary btn-sm border-0 text-hover-danger"
+                               title="Gỡ thông báo này"
+                               onclick="return confirm('CẢNH BÁO: Bạn có chắc chắn muốn xóa thông báo này không?')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+
+                        <p class="mb-0 text-dark opacity-75" style="white-space: pre-line; line-height: 1.6;">{{
+                            n.content }}</p>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-regular fa-folder-open fa-3x mb-3 opacity-50"></i>
+                        <p class="mb-0">Hiện chưa có thông báo nào từ nhà trường.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addNotifyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen me-2"></i>Soạn Thông Báo Mới</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+            </div>
+
+            <form action="{{ url_for('add_notification_process') }}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bản tin <span class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control" required
+                               placeholder="Ví dụ: Thông báo lịch nghỉ Tết Nguyên Đán...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nội dung chi tiết <span class="text-danger">*</span></label>
+                        <textarea name="content" class="form-control" rows="6" required
+                                  placeholder="Nhập nội dung thông báo tại đây..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-danger fw-bold px-4">Đăng Thông Báo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateClock() {
+        const now = new Date();
+
+        // Cập nhật Giờ : Phút : Giây
+        const timeString = now.toLocaleTimeString('vi-VN', { hour12: false });
+        document.getElementById('clock').innerText = timeString;
+
+        // Cập nhật Thứ, Ngày Tháng Năm
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        let dateString = now.toLocaleDateString('vi-VN', options);
+
+        // Viết hoa chữ cái đầu tiên (ví dụ: thứ Hai -> Thứ Hai)
+        dateString = dateString.charAt(0).toUpperCase() + dateString.slice(1);
+
+        document.getElementById('date').innerText = dateString;
+    }
+
+    // Gọi hàm ngay khi load trang
+    updateClock();
+    // Cập nhật mỗi 1000ms (1 giây)
+    setInterval(updateClock, 1000);
+</script>
+
+{% endblock %}

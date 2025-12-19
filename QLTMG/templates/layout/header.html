@@ -1,0 +1,85 @@
+<header class="topbar d-flex align-items-center justify-content-between px-4 py-3 bg-white shadow-sm border-bottom">
+    <div class="d-flex align-items-center">
+        <button class="btn btn-light me-3 d-md-none" type="button" data-bs-toggle="collapse"
+                data-bs-target="#sidebarMenu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <h5 class="mb-0 text-uppercase fw-bold text-dark">
+            {% block header_title %}Chào {{ current_user.name }}, Chúc một ngày vui vẻ!!! {% endblock %}
+        </h5>
+    </div>
+
+    <div class="d-flex align-items-center gap-4">
+        <div class="d-flex align-items-center gap-4">
+            <div class="position-relative cursor-pointer">
+                <i class="fa-regular fa-bell fs-5 text-secondary"></i>
+                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+            </div>
+
+            {% if current_user.is_authenticated %}
+            <div class="dropdown">
+                <a href="#" class="d-flex align-items-center gap-2 text-decoration-none dropdown-toggle"
+                   id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+
+                    <div class="text-end lh-1 d-none d-sm-block">
+                        <span class="d-block fw-bold small text-dark">{{ current_user.name }}</span>
+
+                        <small class="text-muted" style="font-size: 11px;">
+                            {% if current_user.role.name == 'ADMIN' %}
+                            Quản Trị Viên
+                            {% elif current_user.role.name == 'TEACHER' %}
+                            Giáo Viên
+                            {% else %}
+                            Nhân Viên
+                            {% endif %}
+                        </small>
+                    </div>
+
+                    <img src="{{ current_user.avatar }}"
+                         class="rounded-circle border"
+                         width="40" height="40"
+                         alt="Avatar"
+                         style="object-fit: cover;">
+                </a>
+
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="userDropdown">
+
+                    <li><h6 class="dropdown-header text-muted">Xin chào, {{ current_user.name }}!</h6></li>
+
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('profile') }}">
+                            <i class="fa-regular fa-id-card me-2"></i> Hồ sơ cá nhân
+                        </a>
+                    </li>
+
+                    {% if current_user.role.name == 'ADMIN' %}
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('settings_process') }}">
+                            <i class="fa-solid fa-sliders me-2"></i> Cài đặt hệ thống
+                        </a>
+                    </li>
+
+                    <li>
+                        <a class="dropdown-item fw-bold text-primary" href="{{ url_for('register_process') }}">
+                            <i class="fa-solid fa-user-plus me-2"></i> Tạo tài khoản mới
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+
+                    <li>
+                        <a class="dropdown-item text-danger" href="{{ url_for('logout_process') }}">
+                            <i class="fa-solid fa-right-from-bracket me-2"></i> Đăng xuất
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            {% else %}
+            <a href="{{ url_for('login_process') }}" class="btn btn-primary btn-sm">Đăng nhập</a>
+            {% endif %}
+        </div>
+    </div>
+</header>

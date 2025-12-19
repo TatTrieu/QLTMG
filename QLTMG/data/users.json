@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Quản Trị Viên",
+    "username": "admin",
+    "password": "123",
+    "role": "ADMIN",
+    "avatar": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+  },
+  {
+    "name": "Cô Giáo Hạnh",
+    "username": "teacher1",
+    "password": "123",
+    "role": "TEACHER",
+    "avatar": "https://cdn-icons-png.flaticon.com/512/3135/3135768.png"
+  }
+]

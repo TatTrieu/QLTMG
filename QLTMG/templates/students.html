@@ -1,0 +1,325 @@
+{% extends 'layout/base.html' %}
+
+{% block header_title %}QUẢN LÝ TRẺ / LỚP{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+
+        {% if request.args.get('msg') %}
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fa-solid fa-check-circle me-2"></i> {{ request.args.get('msg') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+        {% if request.args.get('err_msg') %}
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i> {{ request.args.get('err_msg') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+
+        <form action="{{ url_for('students') }}" method="get">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="fw-bold text-secondary text-nowrap">Lọc lớp:</label>
+                    <select name="class_id" class="form-select form-select-sm shadow-sm" style="width: 150px;"
+                            onchange="this.form.submit()"
+                            {% if current_user.role.name== 'TEACHER' %}disabled{% endif %}>
+
+                    <option value="">-- Tất cả --</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if current_class_id== c.id|string %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                    </select>
+
+                    <div class="input-group input-group-sm shadow-sm">
+                        <input type="text" name="kw" class="form-control" placeholder="Tìm tên trẻ..."
+                               value="{{ request.args.get('kw', '') }}">
+                        <button class="btn btn-secondary"><i class="fa-solid fa-search"></i></button>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                        data-bs-target="#exportStudentModal">
+                    <i class="fas fa-file-word"></i> Xuất Danh Sách Word
+                </button>
+                {% if current_user.role.name == 'ADMIN' %}
+                <button type="button" class="btn btn-primary btn-sm px-3 fw-bold shadow-sm" data-bs-toggle="modal"
+                        data-bs-target="#addStudentModal">
+                    <i class="fa-solid fa-plus me-1"></i> Tiếp Nhận Trẻ
+                </button>
+                {% endif %}
+            </div>
+        </form>
+
+        {% if current_class %}
+        <div class="alert alert-info d-flex align-items-center shadow-sm mb-4">
+            <div class="me-3 text-primary">
+                <i class="fa-solid fa-chalkboard-user fa-2x"></i>
+            </div>
+            <div>
+                <h6 class="m-0 fw-bold text-uppercase">{{ current_class.name }}</h6>
+                <div class="small text-dark">
+                    Giáo viên chủ nhiệm:
+                    {% if current_class.teacher %}
+                    <span class="fw-bold text-primary fs-6">{{ current_class.teacher.name }}</span>
+                    {% else %}
+                    <span class="text-muted fst-italic">Chưa phân công</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <p class="text-muted small fst-italic mb-2 border-bottom pb-2">
+            <i class="fa-solid fa-circle-info text-info"></i> Sĩ số hiện tại: <b>{{ students|length }}</b> bé.
+        </p>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border">
+                <thead class="bg-light text-secondary">
+                <tr>
+                    <th class="text-center" width="5%">STT</th>
+                    <th width="8%">Ảnh</th>
+                    <th width="20%">Họ tên trẻ</th>
+                    <th>Ngày sinh</th>
+                    <th>Giới tính</th>
+                    <th>Phụ huynh</th>
+                    <th>SĐT liên hệ</th>
+                    <th>Lớp học</th>
+                    <th class="text-end" width="10%">Tác vụ</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for s in students %}
+                <tr>
+                    <td class="text-center">{{ loop.index }}</td>
+
+                    <td>
+                        <img src="{{ s.avatar }}" class="rounded-circle border shadow-sm"
+                             style="width: 40px; height: 40px; object-fit: cover;"
+                             alt="Avatar">
+                    </td>
+
+                    <td class="fw-bold text-primary">{{ s.name }}</td>
+                    <td>{{ s.birth_date.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {% if s.gender.name == 'MALE' %}
+                        <span class="badge bg-light text-primary border border-primary">Nam</span>
+                        {% else %}
+                        <span class="badge bg-light text-danger border border-danger">Nữ</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ s.parent_name }}</td>
+                    <td><a href="tel:{{ s.phone }}" class="text-decoration-none text-dark fw-bold">{{ s.phone }}</a>
+                    </td>
+                    <td><span class="badge bg-info text-dark">{{ s.classroom.name }}</span></td>
+
+                    <td class="text-end">
+                        <button class="btn btn-light btn-sm text-primary border shadow-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editStudentModal"
+                                onclick="fillEditForm('{{ s.id }}', '{{ s.name }}', '{{ s.birth_date.strftime('%Y-%m-%d') }}', '{{ s.gender.name }}', '{{ s.parent_name }}', '{{ s.phone }}', '{{ s.class_id }}', '{{ s.avatar }}')">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+
+                        {% if current_user.role.name == 'ADMIN' %}
+                        <a href="{{ url_for('delete_student_process', student_id=s.id) }}"
+                           class="btn btn-light btn-sm text-danger border ms-1 shadow-sm"
+                           onclick="return confirm('CẢNH BÁO: Xóa hồ sơ bé {{ s.name }}? Hành động không thể hoàn tác!')">
+                            <i class="fa-solid fa-trash"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-5">
+                        <i class="fa-solid fa-box-open fa-3x mb-3"></i><br>Không tìm thấy dữ liệu.
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addStudentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">Tiếp Nhận Hồ Sơ Mới</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_student_process') }}" method="post">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-8 mb-3">
+                            <label class="form-label fw-bold small">Họ tên trẻ <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required placeholder="Nguyễn Văn A">
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label fw-bold small">Link Ảnh (URL)</label>
+                            <input type="text" name="avatar" class="form-control" placeholder="http://...">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small">Ngày sinh <span class="text-danger">*</span></label>
+                            <input type="date" name="birth_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small">Giới tính</label>
+                            <select name="gender" class="form-select">
+                                <option value="FEMALE">Nữ</option>
+                                <option value="MALE">Nam</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Họ tên phụ huynh <span
+                                class="text-danger">*</span></label>
+                        <input type="text" name="parent_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Số điện thoại <span class="text-danger">*</span></label>
+                        <input type="tel" name="phone" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Xếp vào lớp</label>
+                        <select name="class_id" class="form-select" required>
+                            {% for c in classes %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary fw-bold">Lưu hồ sơ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editStudentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title fw-bold text-dark">Cập Nhật Hồ Sơ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('update_student_process') }}" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="student_id" id="edit_id">
+
+                    <div class="row">
+                        <div class="col-8 mb-3">
+                            <label class="form-label fw-bold small">Họ tên trẻ</label>
+                            <input type="text" name="name" id="edit_name" class="form-control" required>
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label fw-bold small">Link Ảnh (URL)</label>
+                            <input type="text" name="avatar" id="edit_avatar" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small">Ngày sinh</label>
+                            <input type="date" name="birth_date" id="edit_dob" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small">Giới tính</label>
+                            <select name="gender" id="edit_gender" class="form-select">
+                                <option value="FEMALE">Nữ</option>
+                                <option value="MALE">Nam</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Họ tên phụ huynh</label>
+                        <input type="text" name="parent_name" id="edit_parent" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Số điện thoại</label>
+                        <input type="tel" name="phone" id="edit_phone" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Chuyển lớp</label>
+                        <select name="class_id" id="edit_class" class="form-select" required>
+                            {% for c in classes %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+<div class="modal fade" id="exportStudentModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Xuất Danh Sách Lớp</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <form action="/export/student-list-word" method="POST">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="font-weight-bold">Chọn lớp cần in:</label>
+                        <select name="class_id" class="form-control" required>
+                            <option value="" disabled selected>-- Chọn lớp --</option>
+                            {% for c in classes %}
+                            <option value="{{ c.id }}" {% if current_class_id== c.id|string %}selected{% endif %}>
+                                {{ c.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-bold">Ghi chú (hiển thị trong file):</label>
+                        <textarea name="note" class="form-control" rows="3"
+                                  placeholder="Ví dụ: Danh sách năm học 2025-2026..."></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Hủy
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-download"></i> Tải về ngay
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    function fillEditForm(id, name, dob, gender, parent, phone, classId, avatar) {
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_dob').value = dob;
+        document.getElementById('edit_gender').value = gender;
+        document.getElementById('edit_parent').value = parent;
+        document.getElementById('edit_phone').value = phone;
+        document.getElementById('edit_class').value = classId;
+        document.getElementById('edit_avatar').value = avatar; // Điền link avatar cũ
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+[
+  {
+    "student_name": "Nguyễn Gia Hân",
+    "parent_name": "Nguyễn Triều Nguyệt",
+    "records": [
+      {
+        "date": "2024-04-24",
+        "weight": 15,
+        "temperature": 36.9,
+        "note": "Bình thường"
+      }
+    ]
+  },
+  {
+    "student_name": "Nguyễn Minh Anh",
+    "parent_name": "Trần Hoàng Nam",
+    "records": [
+      {
+        "date": "2024-04-24",
+        "weight": 17,
+        "temperature": 38.8,
+        "note": "Sốt nhẹ, đã báo phụ huynh"
+      }
+    ]
+  },
+  {
+    "student_name": "Trần Hoàng Nam",
+    "parent_name": "Trần Văn A",
+    "records": [
+      {
+        "date": "2024-04-24",
+        "weight": 15,
+        "temperature": 38.8,
+        "note": "Sốt cao"
+      }
+    ]
+  }
+]
