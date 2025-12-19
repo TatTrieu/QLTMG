@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 import dao
 from QLTMG import app, login, db
 from decorator import anonymous_required
-from models import UserRole, Student, ClassRoom, Gender, HealthRecord, Regulation, Receipt
+from models import UserRole, Student, ClassRoom, Gender, HealthRecord, Regulation, Receipt, User
 import admin
 from datetime import datetime
 import hashlib
@@ -16,8 +16,41 @@ from docx.shared import Pt, Inches, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dateutil.relativedelta import relativedelta
 
-login.login_view = 'login_process'
+with app.app_context():
+    db.create_all()
 
+    # 1. Tạo Quy định mẫu
+    regulations_data = [
+        {'key': 'MAX_STUDENT', 'value': 25, 'desc': 'Sĩ số tối đa một lớp'},
+        {'key': 'BASE_TUITION', 'value': 1500000, 'desc': 'Học phí cơ bản hàng tháng'},
+        {'key': 'MEAL_PRICE', 'value': 25000, 'desc': 'Tiền ăn một ngày'}
+    ]
+
+    for reg in regulations_data:
+        if not Regulation.query.filter_by(key=reg['key']).first():
+            r = Regulation(key=reg['key'], value=reg['value'], description=reg['desc'])
+            db.session.add(r)
+
+    # 2. Tạo Admin mẫu (Mật khẩu là 123)
+    # Lưu ý: Import hashlib ở đầu file nếu chưa có
+    import hashlib
+
+    if not User.query.filter_by(username='admin').first():
+        password_hashed = hashlib.md5("123".encode("utf-8")).hexdigest()
+        admin_user = User(
+            name="Quản Trị Viên",
+            username="admin",
+            password=password_hashed,
+            email="admin@gmail.com",
+            avatar="https://cdn-icons-png.flaticon.com/512/149/149071.png",
+            role=UserRole.ADMIN
+        )
+        db.session.add(admin_user)
+        print("--> Đã tạo tài khoản Admin (User: admin / Pass: 123)")
+
+    db.session.commit()
+
+login.login_view = 'login_process'
 
 @login.user_loader
 def load_user(user_id):
