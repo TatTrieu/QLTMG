@@ -1,5 +1,6 @@
 from sqlalchemy import func, desc
-from models import User, Student, ClassRoom, HealthRecord, Receipt, Regulation, UserRole, Gender, Notification
+from models import User, Student, ClassRoom, HealthRecord, Receipt, Regulation, UserRole, Gender, Notification, \
+    Attendance
 from datetime import datetime
 from QLTMG import db
 import hashlib
@@ -335,7 +336,7 @@ def update_settings(config_data):
             reg = Regulation.query.filter_by(key=key).first()
             if reg:
                 # Cập nhật giá trị mới (ép kiểu int cho an toàn)
-                reg.value = int(value)
+                reg.value = float(value)
 
         db.session.commit()
         return True
@@ -371,24 +372,92 @@ def update_user_profile(user_id, name, email, avatar=None, new_password=None):
     return False
 
 
-def stats_revenue_by_month(year=None):
-    if not year:
-        year = datetime.now().year
-
-    # Sửa thành paid_amount (số tiền thực tế đã thu)
-    return db.session.query(Receipt.month, func.sum(Receipt.paid_amount)) \
-        .filter(func.extract('year', Receipt.created_date) == year) \
-        .group_by(Receipt.month) \
-        .order_by(Receipt.month).all()
-
-def stats_gender():
+def get_dashboard_data(date_input_str, class_id=None):
     """
-    Thống kê số lượng học sinh theo giới tính (Nam/Nữ)
-    Trả về: [('MALE', 10), ('FEMALE', 15)]
+    Lấy dữ liệu thống kê cho Dashboard.
+    - date_input_str: Chuỗi ngày định dạng 'YYYY-MM-DD' (Ví dụ: '2025-12-20')
+    - class_id: ID lớp học (hoặc None nếu xem toàn trường)
     """
-    return db.session.query(Student.gender, func.count(Student.id))\
-             .filter(Student.active == True)\
-             .group_by(Student.gender).all()
+    data = {}
+
+    try:
+        # 1. XỬ LÝ NGÀY VÀ THÁNG
+        # Chuyển chuỗi ngày thành đối tượng datetime
+        current_date = datetime.strptime(date_input_str, '%Y-%m-%d')
+
+        # Tự động suy ra THÁNG từ ngày đó (Để dùng cho thống kê học phí)
+        # Ví dụ: Chọn ngày 20/12/2025 -> Lấy tháng '12/2025'
+        current_month_str = current_date.strftime('%m/%Y')
+        data['month_display'] = current_month_str
+
+    except ValueError:
+        # Phòng trường hợp ngày lỗi, mặc định lấy hôm nay
+        current_date = datetime.now()
+        current_month_str = current_date.strftime('%m/%Y')
+        data['month_display'] = current_month_str
+
+    # -----------------------------------------------------
+    # 2. TỔNG SĨ SỐ HỌC SINH (Theo Lớp hoặc Toàn trường)
+    # -----------------------------------------------------
+    q_students = Student.query.filter(Student.active == True)
+    if class_id:
+        q_students = q_students.filter(Student.class_id == class_id)
+
+    data['total_students'] = q_students.count()
+
+    # -----------------------------------------------------
+    # 3. THỐNG KÊ HỌC PHÍ (Dựa theo THÁNG chứa ngày đó)
+    # -----------------------------------------------------
+    q_receipts = Receipt.query.filter_by(month=current_month_str)
+
+    # Nếu lọc theo lớp thì phải join bảng Student
+    if class_id:
+        q_receipts = q_receipts.join(Student).filter(Student.class_id == class_id)
+
+    total_receipts = q_receipts.count()
+    paid_count = q_receipts.filter(Receipt.status == True).count()
+    unpaid_count = total_receipts - paid_count
+
+    data['paid_count'] = paid_count
+    data['unpaid_count'] = unpaid_count
+
+    # -----------------------------------------------------
+    # 4. THỐNG KÊ VẮNG (Dựa theo NGÀY CHÍNH XÁC)
+    # -----------------------------------------------------
+    # Lấy bảng điểm danh, lọc đúng ngày user chọn
+    q_attendance = Attendance.query.filter(func.date(Attendance.date) == date_input_str)
+
+    if class_id:
+        q_attendance = q_attendance.join(Student).filter(Student.class_id == class_id)
+
+    # Đếm số vắng KHÔNG phép (status = 0)
+    absent_no = q_attendance.filter(Attendance.status == 0).count()
+
+    # Đếm số vắng CÓ phép (status = -1)
+    absent_yes = q_attendance.filter(Attendance.status == -1).count()
+
+    # Tổng hợp lại
+    data['absent_total'] = absent_no + absent_yes  # Tổng số vắng (hiển thị số to)
+    data['absent_permission'] = absent_yes  # Số có phép (hiển thị chú thích nhỏ)
+
+    # -----------------------------------------------------
+    # 5. DANH SÁCH NỢ PHÍ (Top 5 em chưa đóng)
+    # -----------------------------------------------------
+    # Lấy danh sách hóa đơn chưa thanh toán (status=False)
+    debtors = q_receipts.filter(Receipt.status == False).limit(5).all()
+    data['debtors'] = debtors
+
+    # -----------------------------------------------------
+    # 6. TỶ LỆ GIỚI TÍNH
+    # -----------------------------------------------------
+    male_count = q_students.filter(Student.gender == Gender.MALE).count()
+    female_count = data['total_students'] - male_count
+
+    data['gender_male'] = male_count
+    data['gender_female'] = female_count
+
+    return data
+
 
 def get_health_alerts():
     """
@@ -481,3 +550,131 @@ def get_temp_comparison_stats():
             })
 
     return stats
+
+
+def get_attendance_list(class_id, date_str):
+    """
+    Lấy danh sách học sinh kèm trạng thái điểm danh của ngày hôm đó.
+    date_str: Định dạng 'YYYY-MM-DD'
+    """
+    # 1. Lấy tất cả học sinh trong lớp
+    query = Student.query.filter(Student.active == True)
+    if class_id:
+        query = query.filter(Student.class_id == class_id)
+    students = query.all()
+
+    result = []
+    # 2. Duyệt từng học sinh xem ngày đó đã điểm danh chưa
+    for s in students:
+        att = Attendance.query.filter(
+            Attendance.student_id == s.id,
+            func.date(Attendance.date) == date_str  # So sánh ngày
+        ).first()
+
+        result.append({
+            'student': s,
+            'status': att.status if att else 1,  # Mặc định là Có mặt (1) nếu chưa điểm danh
+            'note': att.note if att else ''
+        })
+
+    return result
+
+
+def save_attendance(student_id, date_str, status, note):
+    try:
+        # Kiểm tra xem đã có bản ghi của ngày hôm đó chưa
+        att = Attendance.query.filter(
+            Attendance.student_id == student_id,
+            func.date(Attendance.date) == date_str
+        ).first()
+
+        if att:
+            # Nếu có rồi -> Cập nhật
+            att.status = int(status)
+            att.note = note
+        else:
+            # Chưa có -> Tạo mới
+            new_att = Attendance(
+                student_id=student_id,
+                date=datetime.strptime(date_str, '%Y-%m-%d'),
+                status=int(status),
+                note=note
+            )
+            db.session.add(new_att)
+
+        db.session.commit()
+        return True
+    except Exception as ex:
+        print(ex)
+        db.session.rollback()
+        return False
+
+
+def count_attended_days(student_id, month_str):
+    """
+    Đếm số ngày đi học (status=1) của học sinh trong tháng (month_str: 'mm/yyyy')
+    """
+    try:
+        # Chuyển chuỗi '12/2025' thành đối tượng ngày tháng
+        dt = datetime.strptime(month_str, '%m/%Y')
+
+        # Đếm số bản ghi trong bảng Attendance có status = 1 (Có mặt)
+        count = Attendance.query.filter(
+            Attendance.student_id == student_id,
+            Attendance.status == 1,
+            func.extract('month', Attendance.date) == dt.month,
+            func.extract('year', Attendance.date) == dt.year
+        ).count()
+
+        return count
+    except Exception as ex:
+        print(f"Lỗi đếm ngày: {ex}")
+        return 0
+
+
+def auto_update_tuition_from_attendance(month, class_id=None):
+    """
+    Tự động cập nhật tiền ăn cho tất cả hóa đơn trong tháng dựa vào điểm danh
+    """
+    try:
+        # 1. Lấy đơn giá tiền ăn hiện tại
+        reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first()
+        meal_price = reg_meal.value if reg_meal else 0
+
+        # 2. Lấy danh sách hóa đơn của tháng đó
+        query = Receipt.query.filter_by(month=month)
+
+        # Nếu đang xem 1 lớp cụ thể thì chỉ cập nhật lớp đó cho nhanh
+        if class_id and class_id != 'all' and class_id != '-1':
+            query = query.join(Student).filter(Student.class_id == class_id)
+
+        receipts = query.all()
+
+        # 3. Duyệt từng hóa đơn để tính lại
+        for r in receipts:
+            # Đếm ngày đi học thực tế
+            actual_days = count_attended_days(r.student_id, month)
+
+            # --- QUAN TRỌNG: CHỈ CẬP NHẬT KHI ĐÃ CÓ DỮ LIỆU ĐIỂM DANH ---
+            # (Để tránh trường hợp đầu tháng chưa điểm danh mà bị reset về 0)
+            if actual_days > 0:
+                # Cập nhật số ngày ăn
+                r.meal_days = actual_days
+
+                # Tính lại Thành tiền ăn = Số ngày * Giá 1 ngày
+                r.meal_total = actual_days * meal_price
+
+                # Tính lại Tổng tiền phải thu = Học phí CB + Tiền ăn - Miễn giảm
+                r.total_due = r.base_tuition + r.meal_total - r.discount
+
+                # Cập nhật trạng thái Nợ (Nếu Tổng thu <= Đã đóng thì là Hết nợ)
+                if (r.total_due - r.paid_amount) <= 0:
+                    r.status = True
+                else:
+                    r.status = False
+
+        # Lưu thay đổi vào Database
+        db.session.commit()
+
+    except Exception as ex:
+        print(f"Lỗi tự động cập nhật học phí: {ex}")

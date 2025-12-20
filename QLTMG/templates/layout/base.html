@@ -94,6 +94,12 @@
             </a>
         </li>
         <li class="nav-item">
+            <a href="{{ url_for('attendance') }}" class="nav-link link-dark">
+                <i class="fa-solid fa-calendar-check me-2"></i>
+                Điểm danh
+            </a>
+        </li>
+        <li class="nav-item">
             <a href="{{ url_for('health_process') }}"
                class="nav-link {% if request.endpoint == 'health' %}active{% endif %}">
                 <i class="fa-solid fa-heart-pulse"></i> Sức khỏe

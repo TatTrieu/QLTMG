@@ -49,7 +49,7 @@ class ClassRoom(Base):
 
     # --- THÊM 2 DÒNG NÀY ---
     # Liên kết với bảng User (Giáo viên)
-    teacher_id = Column(Integer, ForeignKey('user.id'), nullable=True)
+    teacher_id = Column(Integer, ForeignKey('user.id'), nullable=True, unique=True)
 
     # Tạo quan hệ để sau này gọi: classroom.teacher.name
     teacher = relationship('User', backref='homeroom_classes', lazy=True)
@@ -138,11 +138,26 @@ class Receipt(db.Model):
     # Khóa ngoại
     student_id = Column(Integer, ForeignKey('student.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)  # Người thu tiền
-
+    student = relationship('Student', backref='receipts', lazy=True)
     # Tính toán số tiền nợ (Property ảo, không lưu DB nhưng gọi được như biến)
     @property
     def debt(self):
         return self.total_due - self.paid_amount
+
+
+class Attendance(db.Model):
+    __tablename__ = 'attendance'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(DateTime, default=datetime.now)  # Ngày điểm danh
+
+    # Trạng thái: 1=Có mặt, 0=Vắng, -1=Vắng có phép
+    status = Column(Integer, default=1)
+    note = Column(String(255), nullable=True)  # Ghi chú (lý do vắng)
+
+    student_id = Column(Integer, ForeignKey('student.id'), nullable=False)
+
+    # Quan hệ để truy vấn ngược nếu cần
+    student = relationship('Student', backref='attendance_records', lazy=True)
 
 
 # --- TẠO DỮ LIỆU MẪU ---

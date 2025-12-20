@@ -185,19 +185,42 @@ def delete_notification(id):
 @app.route("/stats")
 @login_required
 def stats_process():
-    # Lấy dữ liệu biểu đồ
-    class_stats = dao.count_students_by_class()
-    gender_stats = dao.stats_gender()
+    # 1. Lấy NGÀY từ tham số (Thay vì lấy tháng)
+    date_str = request.args.get('date')
 
-    # Thống kê doanh thu năm nay
-    current_year = datetime.now().year
-    revenue_stats = dao.stats_revenue_by_month(current_year)
+    # Nếu không chọn, mặc định lấy Hôm nay
+    if not date_str:
+        date_str = datetime.now().strftime('%Y-%m-%d')
+
+    # 2. Xử lý Phân quyền Lớp (Giữ nguyên code cũ)
+    class_id = request.args.get('class_id')
+    current_class_obj = None
+
+    if current_user.role == UserRole.TEACHER:
+        my_class = dao.get_class_by_teacher(current_user.id)
+        if my_class:
+            class_id = my_class.id
+            current_class_obj = my_class
+    else:
+        if class_id and class_id != 'all':
+            class_id = int(class_id)
+            current_class_obj = ClassRoom.query.get(class_id)
+        else:
+            class_id = None
+
+    # 3. Gọi DAO lấy dữ liệu (Truyền ngày cụ thể vào)
+    stats_data = dao.get_dashboard_data(date_str, class_id)
+
+    # Lấy cài đặt và danh sách lớp
+    school_settings = dao.get_settings()
+    classes = dao.load_classes()
 
     return render_template("stats.html",
-                           class_stats=class_stats,
-                           gender_stats=gender_stats,
-                           revenue_stats=revenue_stats,
-                           year=current_year)
+                           data=stats_data,
+                           current_date=date_str,  # Truyền biến ngày sang View
+                           classes=classes,
+                           current_class_obj=current_class_obj,
+                           settings=school_settings)
 
 
 @app.route("/students/add", methods=["POST"])
@@ -359,16 +382,13 @@ def tuition():
     # ---------------------------------------------------------
     # 1. XỬ LÝ DANH SÁCH THÁNG (Lấy từ Database)
     # ---------------------------------------------------------
-    # Lấy tất cả các tháng đã có trong bảng Receipt
     existing_months_query = db.session.query(Receipt.month).distinct().all()
-    # Chuyển kết quả từ [('12/2025',), ('01/2026',)] thành ['12/2025', '01/2026']
     month_list = [m[0] for m in existing_months_query]
 
-    # Sắp xếp danh sách tháng theo thời gian (Mới nhất lên đầu)
     try:
         month_list.sort(key=lambda x: datetime.strptime(x, '%m/%Y'), reverse=True)
     except:
-        pass  # Bỏ qua nếu có dữ liệu rác không đúng định dạng
+        pass
 
     # ---------------------------------------------------------
     # 2. XỬ LÝ THÁNG ĐANG CHỌN
@@ -376,16 +396,12 @@ def tuition():
     month_str = request.args.get('month')
     class_id = request.args.get('class_id')
 
-    # Nếu không chọn, mặc định lấy tháng hiện tại thực tế
     if not month_str:
         month_str = datetime.now().strftime('%m/%Y')
 
-    # --- QUAN TRỌNG: Đảm bảo tháng đang chọn luôn có trong danh sách ---
-    # (Để hiển thị được trên Dropdown ngay cả khi tháng đó chưa có trong DB)
     if month_str not in month_list:
         month_list.insert(0, month_str)
 
-    # Tính toán Prev/Next để hỗ trợ chuyển tháng (vẫn giữ logic này để linh hoạt)
     try:
         curr_date = datetime.strptime(month_str, '%m/%Y')
         prev_month = (curr_date - relativedelta(months=1)).strftime('%m/%Y')
@@ -397,7 +413,7 @@ def tuition():
         next_month = (curr_date + relativedelta(months=1)).strftime('%m/%Y')
 
     # ---------------------------------------------------------
-    # 3. XỬ LÝ PHÂN QUYỀN & LẤY DỮ LIỆU (Giữ nguyên)
+    # 3. XỬ LÝ PHÂN QUYỀN (Admin/Giáo viên)
     # ---------------------------------------------------------
     current_class_obj = None
     if current_user.role == UserRole.TEACHER:
@@ -411,13 +427,24 @@ def tuition():
         if class_id and class_id != 'all':
             current_class_obj = ClassRoom.query.get(class_id)
 
+    # =========================================================
+    # [MỚI] TỰ ĐỘNG TÍNH LẠI TIỀN ĂN THEO ĐIỂM DANH
+    # =========================================================
+    # Gọi hàm này TRƯỚC khi lấy dữ liệu hiển thị
+    if month_str:
+         dao.auto_update_tuition_from_attendance(month_str, class_id)
+    # =========================================================
+
+    # ---------------------------------------------------------
+    # 4. LẤY DỮ LIỆU ĐỂ HIỂN THỊ
+    # ---------------------------------------------------------
     # Lấy đơn giá
     reg_tuition = Regulation.query.filter_by(key='BASE_TUITION').first()
     reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first()
     base_price = reg_tuition.value if reg_tuition else 0
     meal_price = reg_meal.value if reg_meal else 0
 
-    # Lấy học sinh
+    # Lấy danh sách học sinh
     query = Student.query.filter(Student.active == True)
     if class_id and class_id != 'all' and class_id != -1:
         query = query.filter_by(class_id=class_id)
@@ -425,9 +452,7 @@ def tuition():
         query = query.filter(Student.id == -1)
     students = query.all()
 
-    # ---------------------------------------------------------
-    # 4. TÍNH TOÁN DỮ LIỆU HIỂN THỊ
-    # ---------------------------------------------------------
+    # Tính toán hiển thị
     data_list = []
     total_summary = {'meal_total': 0, 'discount': 0, 'total_due': 0, 'paid': 0, 'debt': 0}
 
@@ -437,10 +462,12 @@ def tuition():
                 'base_tuition': base_price, 'meal_price': meal_price}
 
         if receipt:
+            # Dữ liệu lấy từ Database (đã được auto_update cập nhật ở trên)
             item.update({'meal_days': receipt.meal_days, 'meal_total': receipt.meal_total,
                          'discount': receipt.discount, 'total_due': receipt.total_due,
                          'paid_amount': receipt.paid_amount, 'is_saved': True})
         else:
+            # Chưa tạo dữ liệu -> Hiển thị mặc định
             default_days = 22
             meal_total_calc = default_days * meal_price
             item.update({'meal_days': default_days, 'meal_total': meal_total_calc,
@@ -449,7 +476,7 @@ def tuition():
 
         item['debt'] = item['total_due'] - item['paid_amount']
 
-        # Cộng dồn
+        # Cộng dồn tổng
         total_summary['meal_total'] += item['meal_total']
         total_summary['discount'] += item['discount']
         total_summary['total_due'] += item['total_due']
@@ -467,10 +494,9 @@ def tuition():
                            current_month=month_str,
                            next_month=next_month,
                            prev_month=prev_month,
-                           month_list=month_list,  # <--- Truyền danh sách tháng sang View
+                           month_list=month_list,
                            current_class_id=str(class_id) if class_id else None,
                            current_class_obj=current_class_obj)
-
 
 # --- ROUTE MỚI: KHỞI TẠO DỮ LIỆU THÁNG ---
 @app.route("/tuition/init", methods=['POST'])
@@ -1087,6 +1113,65 @@ def export_tuition_list_word():
         download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     )
+
+
+@app.route("/attendance", methods=['GET', 'POST'])
+@login_required
+def attendance():
+    # 1. Xử lý logic chọn lớp (Giống trang học phí)
+    class_id = request.args.get('class_id')
+
+    # Nếu là Giáo viên -> Tự gán lớp của họ
+    current_class_obj = None
+    if current_user.role.name == 'TEACHER':
+        my_class = dao.get_class_by_teacher(current_user.id)
+        if my_class:
+            class_id = my_class.id
+            current_class_obj = my_class
+    else:
+        # Nếu là Admin mà có chọn lớp
+        if class_id and class_id != 'all':
+            current_class_obj = dao.get_class_by_id(class_id)
+
+    # 2. Lấy ngày chọn (Mặc định là hôm nay)
+    date_str = request.args.get('date')
+    if not date_str:
+        date_str = datetime.now().strftime('%Y-%m-%d')
+
+    # 3. Lấy danh sách điểm danh
+    student_list = []
+    if class_id:  # Chỉ hiện khi đã xác định được lớp
+        student_list = dao.get_attendance_list(class_id, date_str)
+
+    classes = dao.load_classes()  # Để Admin chọn lớp
+
+    return render_template('attendance.html',
+                           students=student_list,
+                           classes=classes,
+                           current_class_id=str(class_id) if class_id else None,
+                           current_class_obj=current_class_obj,
+                           current_date=date_str)
+
+
+@app.route("/attendance/save", methods=['POST'])
+@login_required
+def save_attendance_process():
+    # Lấy dữ liệu từ form
+    class_id = request.form.get('class_id')
+    date_str = request.form.get('date')
+
+    # Form sẽ gửi về danh sách dạng: status_1, note_1, status_2, note_2... (với số là id học sinh)
+    # Chúng ta cần duyệt qua tất cả key trong form để tìm dữ liệu
+    for key in request.form:
+        if key.startswith('status_'):
+            student_id = key.split('_')[1]  # Lấy ID học sinh từ tên input
+            status = request.form.get(key)
+            note = request.form.get(f'note_{student_id}')
+
+            # Gọi hàm lưu
+            dao.save_attendance(student_id, date_str, status, note)
+
+    return redirect(url_for('attendance', class_id=class_id, date=date_str, msg="Đã lưu điểm danh thành công!"))
 
 
 # --- CHẠY APP ---
