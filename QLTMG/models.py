@@ -173,6 +173,7 @@ if __name__ == "__main__":
 
     # Sử dụng app_context của app đã import
     with app.app_context():
+        db.drop_all()
         db.create_all()
 
         # Tạo Quy định mẫu
