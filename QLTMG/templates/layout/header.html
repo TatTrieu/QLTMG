@@ -11,10 +11,6 @@
 
     <div class="d-flex align-items-center gap-4">
         <div class="d-flex align-items-center gap-4">
-            <div class="position-relative cursor-pointer">
-                <i class="fa-regular fa-bell fs-5 text-secondary"></i>
-                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
-            </div>
 
             {% if current_user.is_authenticated %}
             <div class="dropdown">
@@ -55,7 +51,7 @@
                     {% if current_user.role.name == 'ADMIN' %}
                     <li>
                         <a class="dropdown-item" href="{{ url_for('settings_process') }}">
-                            <i class="fa-solid fa-sliders me-2"></i> Cài đặt hệ thống
+                            <i class="fa-solid fa-sliders me-2"></i> Thay đổi quy định
                         </a>
                     </li>
 

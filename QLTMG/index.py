@@ -16,39 +16,126 @@ from docx.shared import Pt, Inches, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dateutil.relativedelta import relativedelta
 
-with app.app_context():
-    db.create_all()
-
-    # 1. Tạo Quy định mẫu
-    regulations_data = [
-        {'key': 'MAX_STUDENT', 'value': 25, 'desc': 'Sĩ số tối đa một lớp'},
-        {'key': 'BASE_TUITION', 'value': 1500000, 'desc': 'Học phí cơ bản hàng tháng'},
-        {'key': 'MEAL_PRICE', 'value': 25000, 'desc': 'Tiền ăn một ngày'}
-    ]
-
-    for reg in regulations_data:
-        if not Regulation.query.filter_by(key=reg['key']).first():
-            r = Regulation(key=reg['key'], value=reg['value'], description=reg['desc'])
-            db.session.add(r)
-
-    # 2. Tạo Admin mẫu (Mật khẩu là 123)
-    # Lưu ý: Import hashlib ở đầu file nếu chưa có
-    import hashlib
-
-    if not User.query.filter_by(username='admin').first():
-        password_hashed = hashlib.md5("123".encode("utf-8")).hexdigest()
-        admin_user = User(
-            name="Quản Trị Viên",
-            username="admin",
-            password=password_hashed,
-            email="admin@gmail.com",
-            avatar="https://cdn-icons-png.flaticon.com/512/149/149071.png",
-            role=UserRole.ADMIN
-        )
-        db.session.add(admin_user)
-        print("--> Đã tạo tài khoản Admin (User: admin / Pass: 123)")
-
-    db.session.commit()
+# with app.app_context():
+#     db.create_all()
+#
+#     # =====================================================
+#     # 1. TẠO QUY ĐỊNH (SETTINGS)
+#     # =====================================================
+#     regulations_data = [
+#         {'key': 'MAX_STUDENT', 'value': 25, 'desc': 'Sĩ số tối đa một lớp'},
+#         {'key': 'BASE_TUITION', 'value': 1500000, 'desc': 'Học phí cơ bản hàng tháng'},
+#         {'key': 'MEAL_PRICE', 'value': 25000, 'desc': 'Tiền ăn một ngày'}
+#     ]
+#
+#     for reg in regulations_data:
+#         if not Regulation.query.filter_by(key=reg['key']).first():
+#             r = Regulation(key=reg['key'], value=reg['value'], description=reg['desc'])
+#             db.session.add(r)
+#
+#     db.session.commit()  # Lưu quy định trước để lấy giá tiền
+#
+#     # =====================================================
+#     # 2. TẠO TÀI KHOẢN (ADMIN + 2 GIÁO VIÊN)
+#     # =====================================================
+#     password_hashed = hashlib.md5("123".encode("utf-8")).hexdigest()
+#
+#     # 2.1. Admin
+#     if not User.query.filter_by(username='admin').first():
+#         admin = User(name="Quản Trị Viên", username="admin", password=password_hashed,
+#                      email="admin@gmail.com", role=UserRole.ADMIN)
+#         db.session.add(admin)
+#
+#     # 2.2. Giáo viên 1 (Cô Lan)
+#     gv1 = User.query.filter_by(username='gv1').first()
+#     if not gv1:
+#         gv1 = User(name="Cô Trần Thị Lan", username="gv1", password=password_hashed,
+#                    email="lan@gmail.com", role=UserRole.TEACHER,
+#                    avatar="https://cdn-icons-png.flaticon.com/512/6818/6818318.png")
+#         db.session.add(gv1)
+#
+#     # 2.3. Giáo viên 2 (Cô Mai)
+#     gv2 = User.query.filter_by(username='gv2').first()
+#     if not gv2:
+#         gv2 = User(name="Cô Nguyễn Thu Mai", username="gv2", password=password_hashed,
+#                    email="mai@gmail.com", role=UserRole.TEACHER,
+#                    avatar="https://cdn-icons-png.flaticon.com/512/6818/6818318.png")
+#         db.session.add(gv2)
+#
+#     db.session.commit()  # Lưu User để lấy ID gán cho lớp
+#
+#     # =====================================================
+#     # 3. TẠO 2 LỚP HỌC (Gán cho 2 GV vừa tạo)
+#     # =====================================================
+#     # Lớp Mầm 1 - Cô Lan chủ nhiệm
+#     class1 = ClassRoom.query.filter_by(name="Mầm 1").first()
+#     if not class1:
+#         class1 = ClassRoom(name="Mầm 1", teacher_id=gv1.id)
+#         db.session.add(class1)
+#
+#     # Lớp Chồi 1 - Cô Mai chủ nhiệm
+#     class2 = ClassRoom.query.filter_by(name="Chồi 1").first()
+#     if not class2:
+#         class2 = ClassRoom(name="Chồi 1", teacher_id=gv2.id)
+#         db.session.add(class2)
+#
+#     db.session.commit()  # Lưu lớp để lấy ID gán cho học sinh
+#
+#     # =====================================================
+#     # 4. TẠO 6 HỌC SINH MẪU
+#     # =====================================================
+#     # Chỉ tạo nếu chưa có học sinh nào (tránh tạo trùng lặp mỗi lần chạy lại)
+#     if Student.query.count() == 0:
+#         students_data = [
+#             # 3 Bé lớp Mầm 1
+#             {"name": "Nguyễn Văn An", "gender": Gender.MALE, "dob": "2021-05-15", "parent": "Anh Bình",
+#              "phone": "0901234567", "class_id": class1.id},
+#             {"name": "Trần Thị Bống", "gender": Gender.FEMALE, "dob": "2021-08-20", "parent": "Chị Hoa",
+#              "phone": "0902345678", "class_id": class1.id},
+#             {"name": "Lê Hoàng Cường", "gender": Gender.MALE, "dob": "2021-12-10", "parent": "Anh Dũng",
+#              "phone": "0903456789", "class_id": class1.id},
+#
+#             # 3 Bé lớp Chồi 1
+#             {"name": "Phạm Ngọc Diệp", "gender": Gender.FEMALE, "dob": "2020-02-14", "parent": "Chị Lan",
+#              "phone": "0904567890", "class_id": class2.id},
+#             {"name": "Hoàng Minh Đức", "gender": Gender.MALE, "dob": "2020-06-01", "parent": "Anh Tuấn",
+#              "phone": "0905678901", "class_id": class2.id},
+#             {"name": "Vũ Thảo Vy", "gender": Gender.FEMALE, "dob": "2020-10-30", "parent": "Chị Mai",
+#              "phone": "0906789012", "class_id": class2.id}
+#         ]
+#
+#         # Lấy giá tiền để tạo hóa đơn luôn
+#         reg_base = Regulation.query.filter_by(key='BASE_TUITION').first().value
+#         reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first().value
+#         current_month = datetime.now().strftime('%m/%Y')
+#
+#         for s in students_data:
+#             # Tạo học sinh
+#             new_s = Student(
+#                 name=s["name"],
+#                 gender=s["gender"],
+#                 birth_date=datetime.strptime(s["dob"], "%Y-%m-%d"),
+#                 parent_name=s["parent"],
+#                 phone=s["phone"],
+#                 class_id=s["class_id"]
+#             )
+#             db.session.add(new_s)
+#             db.session.flush()  # Lấy ID học sinh vừa tạo
+#
+#             # Tạo hóa đơn mặc định cho tháng này
+#             receipt = Receipt(
+#                 student_id=new_s.id,
+#                 month=current_month,
+#                 meal_days=22,
+#                 base_tuition=reg_base,
+#                 meal_total=22 * reg_meal,
+#                 total_due=reg_base + (22 * reg_meal),
+#                 user_id=1  # Gán đại cho Admin tạo
+#             )
+#             db.session.add(receipt)
+#
+#         db.session.commit()
+#         print("--> Đã khởi tạo dữ liệu mẫu thành công!")
 
 login.login_view = 'login_process'
 
@@ -236,12 +323,20 @@ def add_student_process():
     parent_name = request.form.get("parent_name")
     phone = request.form.get("phone")
     class_id = request.form.get("class_id")
-
-    # --- BỔ SUNG LẤY AVATAR ---
     avatar = request.form.get("avatar")
-    # --------------------------
 
-    # 2. Gọi DAO để thêm (Truyền thêm user_id hiện tại để tạo hóa đơn)
+    # --- [VALIDATION] KIỂM TRA SỐ ĐIỆN THOẠI ---
+    if phone:
+        # Kiểm tra xem có ký tự nào không phải là số không
+        if not phone.isdigit():
+            return redirect(url_for('students', err_msg="Lỗi: Số điện thoại chỉ được chứa ký tự số!"))
+
+        # (Tùy chọn) Kiểm tra độ dài, ví dụ SĐT Việt Nam thường 10 số
+        if len(phone) < 9 or len(phone) > 11:
+            return redirect(url_for('students', err_msg="Lỗi: Số điện thoại phải từ 9-11 số!"))
+    # -------------------------------------------
+
+    # 2. Gọi DAO để thêm
     success, message = dao.add_student(name, birth_date, gender, parent_name, phone, class_id, avatar, current_user.id)
 
     if success:
@@ -307,7 +402,7 @@ def delete_student_process(student_id):
 @app.route("/students/update", methods=["POST"])
 @login_required
 def update_student_process():
-    # Lấy dữ liệu từ form sửa
+    # 1. Lấy dữ liệu từ form
     student_id = request.form.get("student_id")
     name = request.form.get("name")
     birth_date = request.form.get("birth_date")
@@ -315,16 +410,32 @@ def update_student_process():
     parent_name = request.form.get("parent_name")
     phone = request.form.get("phone")
     class_id = request.form.get("class_id")
-
-    # --- THÊM DÒNG NÀY ---
     avatar = request.form.get("avatar")
-    # ---------------------
 
-    # --- SỬA DÒNG GỌI HÀM (Thêm biến avatar vào cuối) ---
-    if dao.update_student(student_id, name, birth_date, gender, parent_name, phone, class_id, avatar):
-        return redirect(url_for('students', msg="Cập nhật thông tin thành công!"))
+    # --- [VALIDATION] KIỂM TRA SỐ ĐIỆN THOẠI (SỬA LẠI ĐOẠN NÀY) ---
+    if phone:
+        # 1. Kiểm tra phải là số
+        if not phone.isdigit():
+            return redirect(url_for('students', err_msg="Lỗi: Số điện thoại chỉ được chứa ký tự số!"))
+
+        # 2. Kiểm tra độ dài (9 - 11 số) --> BỔ SUNG DÒNG NÀY
+        if len(phone) < 9 or len(phone) > 11:
+            return redirect(url_for('students', err_msg="Lỗi: Số điện thoại phải từ 9 đến 11 số!"))
+    # --------------------------------------------------------------
+
+    # 2. Gọi hàm update (Lưu ý: Code dưới đây hỗ trợ cả trường hợp DAO trả về True/False hoặc Tuple)
+    result = dao.update_student(student_id, name, birth_date, gender, parent_name, phone, class_id, avatar)
+
+    # Kiểm tra kết quả trả về (để tương thích với code cũ hay mới của bạn)
+    if isinstance(result, tuple):
+        success, message = result
     else:
-        return redirect(url_for('students', err_msg="Lỗi khi cập nhật!"))
+        success, message = result, "Cập nhật thành công!" if result else "Lỗi cập nhật!"
+
+    if success:
+        return redirect(url_for('students', msg=message))
+    else:
+        return redirect(url_for('students', err_msg=message))
 
 
 @app.route("/health")
@@ -361,16 +472,34 @@ def health_process():
 @app.route("/health/update", methods=["POST"])
 @login_required
 def update_health_process():
-    # Chúng ta dùng student_id thay vì health_id vì đang tạo mới
     student_id = request.form.get("student_id")
 
-    height = request.form.get("height")
-    weight = request.form.get("weight")
-    temperature = request.form.get("temperature")
+    # Lấy dữ liệu dạng chuỗi từ form
+    height_str = request.form.get("height")
+    weight_str = request.form.get("weight")
+    temp_str = request.form.get("temperature")
     note = request.form.get("note")
 
-    # --- SỬA DÒNG NÀY: Gọi hàm insert (add_new) ---
-    if dao.add_new_health_checkup(student_id, height, weight, temperature, note):
+    # --- [VALIDATION] KIỂM TRA SỐ ÂM ---
+    try:
+        # Chuyển đổi sang số thực để kiểm tra
+        h = float(height_str) if height_str else 0
+        w = float(weight_str) if weight_str else 0
+        t = float(temp_str) if temp_str else 0
+
+        if h < 0 or w < 0 or t < 0:
+            return redirect(
+                url_for('health_process', err_msg="Lỗi: Chiều cao, Cân nặng, Nhiệt độ không được nhập số âm!"))
+
+        # Kiểm tra nhiệt độ hợp lý (Ví dụ không thể > 45 độ hoặc < 30 độ quá vô lý - Tùy chọn)
+        if t > 45 or (t > 0 and t < 30):
+            return redirect(url_for('health_process', err_msg="Lỗi: Nhiệt độ không hợp lý!"))
+
+    except ValueError:
+        return redirect(url_for('health_process', err_msg="Lỗi: Vui lòng nhập đúng định dạng số!"))
+    # -----------------------------------
+
+    if dao.add_new_health_checkup(student_id, height_str, weight_str, temp_str, note):
         return redirect(url_for('health_process', msg="Đã cập nhật số liệu mới thành công!"))
     else:
         return redirect(url_for('health_process', err_msg="Lỗi khi lưu dữ liệu!"))
@@ -610,40 +739,29 @@ def update_single_tuition():
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings_process():
-    # --- LỚP BẢO MẬT 1: CHẶN USER KHÔNG PHẢI ADMIN ---
-    # Kiểm tra tên Role (UserRole.ADMIN)
     if current_user.role.name != 'ADMIN':
-        # Chuyển hướng về trang chủ kèm thông báo lỗi
-        return redirect(url_for('index', err_msg="Truy cập bị từ chối! Bạn không phải là Quản trị viên."))
+        return redirect(url_for('index', err_msg="Truy cập bị từ chối!"))
 
     msg = None
     err_msg = None
 
-    # --- XỬ LÝ KHI BẤM LƯU (POST) ---
     if request.method == "POST":
-        try:
-            data = {
-                'MAX_STUDENT': request.form.get('max_student'),
-                'BASE_TUITION': request.form.get('base_tuition'),
-                'MEAL_PRICE': request.form.get('meal_price')
-            }
+        data = {
+            'MAX_STUDENT': request.form.get('max_student'),
+            'BASE_TUITION': request.form.get('base_tuition'),
+            'MEAL_PRICE': request.form.get('meal_price')
+        }
 
-            # Gọi DAO để lưu vào DB
-            if dao.update_settings(data):
-                msg = "Đã cập nhật cấu hình hệ thống thành công!"
-            else:
-                err_msg = "Lỗi Database! Không thể lưu cài đặt."
-        except Exception as e:
-            err_msg = f"Lỗi không mong muốn: {str(e)}"
+        # [MỚI] GỌI HÀM SETTINGS VÀ NHẬN THÔNG BÁO CẢNH BÁO (NẾU CÓ)
+        success, message = dao.update_settings(data)
 
-    # --- HIỂN THỊ GIAO DIỆN (GET) ---
-    # Lấy thông số hiện tại để điền vào form
+        if success:
+            msg = message  # Hiển thị thành công kèm cảnh báo (nếu có)
+        else:
+            err_msg = message
+
     current_settings = dao.get_settings()
-
-    return render_template("settings.html",
-                           settings=current_settings,
-                           msg=msg,
-                           err_msg=err_msg)
+    return render_template("settings.html", settings=current_settings, msg=msg, err_msg=err_msg)
 
 
 @app.route("/profile", methods=['GET', 'POST'])

@@ -189,7 +189,9 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Số điện thoại <span class="text-danger">*</span></label>
-                        <input type="tel" name="phone" class="form-control" required>
+                        <input type="text" name="phone" class="form-control"
+                               oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');"
+                               placeholder="Nhập số điện thoại...">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Xếp vào lớp</label>
@@ -250,7 +252,9 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Số điện thoại</label>
-                        <input type="tel" name="phone" id="edit_phone" class="form-control" required>
+                        <input type="text" name="phone" class="form-control"
+                               oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');"
+                               placeholder="Nhập số điện thoại...">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Chuyển lớp</label>

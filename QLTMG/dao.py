@@ -195,63 +195,66 @@ def add_user(name, username, password, email=None, avatar=None):
         return False
 
 
+def check_class_capacity(class_id):
+    """
+    Kiểm tra lớp học còn chỗ trống không.
+    Trả về: True (Còn chỗ), False (Đã đầy)
+    """
+    if not class_id: return True  # Chưa xếp lớp thì không tính
+
+    # 1. Lấy quy định Sĩ số tối đa
+    reg = Regulation.query.filter_by(key='MAX_STUDENT').first()
+    max_student = int(reg.value) if reg else 30  # Mặc định 30 nếu chưa cài
+
+    # 2. Đếm số học sinh hiện tại của lớp (Chỉ tính học sinh đang Active)
+    current_count = Student.query.filter(Student.class_id == class_id, Student.active == True).count()
+
+    # 3. So sánh
+    if current_count >= max_student:
+        return False  # Đã đầy hoặc vượt quá
+    return True
+
+
+# --- Sửa lại hàm add_student ---
 def add_student(name, birth_date, gender, parent_name, phone, class_id, avatar=None, creator_id=None):
     try:
-        # 1. TẠO HỌC SINH MỚI
+        # [MỚI] KIỂM TRA SĨ SỐ TRƯỚC KHI THÊM
+        if class_id and not check_class_capacity(class_id):
+            return False, "Lớp này đã ĐỦ SĨ SỐ quy định! Vui lòng chọn lớp khác hoặc tăng giới hạn sĩ số."
+
+        # ... (Phần code tạo new_student cũ giữ nguyên) ...
         new_student = Student(name=name, parent_name=parent_name, phone=phone, class_id=class_id)
-
-        # Xử lý ngày sinh
-        if birth_date:
-            new_student.birth_date = datetime.strptime(birth_date, "%Y-%m-%d")
-
-        # Xử lý giới tính
+        if birth_date: new_student.birth_date = datetime.strptime(birth_date, "%Y-%m-%d")
         if gender == 'MALE':
             new_student.gender = Gender.MALE
         elif gender == 'FEMALE':
             new_student.gender = Gender.FEMALE
-
-        # Xử lý Avatar (Nếu không nhập thì dùng ảnh mặc định trong Model)
-        if avatar and avatar.strip():
-            new_student.avatar = avatar
+        if avatar and avatar.strip(): new_student.avatar = avatar
 
         db.session.add(new_student)
+        db.session.flush()  # Để lấy ID
 
-        # --- QUAN TRỌNG: Đẩy dữ liệu lên để lấy được ID của học sinh mới ---
-        db.session.flush()
-
-        # 2. TẠO HÓA ĐƠN HỌC PHÍ MẶC ĐỊNH CHO THÁNG NÀY
-        # Lấy quy định tiền
+        # ... (Phần tạo hóa đơn cũ giữ nguyên) ...
+        # (Copy lại đoạn tạo Receipt từ code cũ của bạn vào đây)
         reg_tuition = Regulation.query.filter_by(key='BASE_TUITION').first()
         reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first()
-
         base_price = reg_tuition.value if reg_tuition else 0
         meal_price = reg_meal.value if reg_meal else 0
-
-        # Các thông số mặc định
         current_month = datetime.now().strftime('%m/%Y')
         default_days = 22
         meal_total = default_days * meal_price
         total_due = base_price + meal_total
 
-        # Tạo hóa đơn
-        if creator_id:  # Chỉ tạo nếu có thông tin người tạo
+        if creator_id:
             new_receipt = Receipt(
-                student_id=new_student.id,
-                month=current_month,
-                meal_days=default_days,
-                base_tuition=base_price,
-                meal_total=meal_total,
-                discount=0,
-                total_due=total_due,
-                paid_amount=0,
-                status=False,  # Chưa đóng
-                user_id=creator_id
+                student_id=new_student.id, month=current_month, meal_days=default_days,
+                base_tuition=base_price, meal_total=meal_total, discount=0,
+                total_due=total_due, paid_amount=0, status=False, user_id=creator_id
             )
             db.session.add(new_receipt)
 
-        # 3. Lưu tất cả vào DB
         db.session.commit()
-        return True, "Thêm học sinh và tạo hóa đơn thành công!"
+        return True, "Thêm học sinh thành công!"
 
     except Exception as ex:
         print(f"Lỗi add_student: {ex}")
@@ -275,30 +278,28 @@ def update_student(student_id, name, birth_date, gender, parent_name, phone, cla
     try:
         s = Student.query.get(student_id)
         if s:
+            # [MỚI] KIỂM TRA NẾU ĐỔI LỚP
+            # Nếu có chọn lớp mới VÀ lớp mới khác lớp cũ
+            if class_id and str(s.class_id) != str(class_id):
+                if not check_class_capacity(class_id):
+                    return False, "Lớp chuyển đến đã ĐỦ SĨ SỐ! Không thể chuyển học sinh vào."
+
+            # ... (Các lệnh gán dữ liệu cũ giữ nguyên) ...
             s.name = name
             s.birth_date = datetime.strptime(birth_date, "%Y-%m-%d") if birth_date else None
-
-            # Xử lý Gender (Enum)
-            if gender == 'MALE':
-                s.gender = Gender.MALE
-            elif gender == 'FEMALE':
-                s.gender = Gender.FEMALE
-
+            if gender == 'MALE': s.gender = Gender.MALE
+            elif gender == 'FEMALE': s.gender = Gender.FEMALE
             s.parent_name = parent_name
             s.phone = phone
             s.class_id = class_id
-
-            # --- THÊM ĐOẠN NÀY ĐỂ LƯU AVATAR ---
-            if avatar and avatar.strip():  # Nếu có nhập link ảnh
-                s.avatar = avatar
-            # -----------------------------------
+            if avatar and avatar.strip(): s.avatar = avatar
 
             db.session.commit()
-            return True
+            return True, "Cập nhật thông tin thành công!" # Trả về Tuple (True, Msg)
     except Exception as ex:
         print(f"Lỗi update student: {ex}")
-        return False
-    return False
+        return False, "Lỗi hệ thống khi cập nhật!"
+    return False, "Không tìm thấy học sinh!"
 
 
 def load_students(kw=None, class_id=None):
@@ -327,23 +328,38 @@ def get_settings():
 
 def update_settings(config_data):
     """
-    Cập nhật quy định.
-    config_data: {'MAX_STUDENT': '30', ...}
+    Trả về: (True/False, Message)
     """
+    warning_msg = ""
     try:
         for key, value in config_data.items():
-            # Tìm dòng quy định theo Key
             reg = Regulation.query.filter_by(key=key).first()
             if reg:
-                # Cập nhật giá trị mới (ép kiểu int cho an toàn)
                 reg.value = float(value)
 
         db.session.commit()
-        return True
+
+        # [MỚI] SAU KHI LƯU, KIỂM TRA LẠI CÁC LỚP
+        if 'MAX_STUDENT' in config_data:
+            new_max = float(config_data['MAX_STUDENT'])
+
+            # Tìm các lớp có sĩ số > new_max
+            overloaded_classes = db.session.query(ClassRoom.name) \
+                .join(Student).filter(Student.active == True) \
+                .group_by(ClassRoom.id) \
+                .having(func.count(Student.id) > new_max).all()
+
+            if overloaded_classes:
+                # Tạo danh sách tên lớp: "Mầm 1, Chồi 2..."
+                names = ", ".join([c[0] for c in overloaded_classes])
+                warning_msg = f" | CẢNH BÁO: Các lớp ({names}) hiện đang vượt quá quy định mới ({int(new_max)} em). Vui lòng chuyển bớt học sinh!"
+
+        return True, "Đã cập nhật cấu hình thành công!" + warning_msg
+
     except Exception as ex:
         print(f"Lỗi update settings: {ex}")
         db.session.rollback()
-        return False
+        return False, "Lỗi Database! Không thể lưu cài đặt."
 
 
 def update_user_profile(user_id, name, email, avatar=None, new_password=None):

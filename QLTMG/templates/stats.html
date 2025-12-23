@@ -10,18 +10,20 @@
             <i class="fa-solid fa-calendar-days me-2"></i>
             Dữ liệu ngày: <span class="text-primary">{{ current_date }}</span>
             {% if current_class_obj %}
-                <span class="mx-2">|</span> Lớp: <span class="text-primary">{{ current_class_obj.name }}</span>
+            <span class="mx-2">|</span> Lớp: <span class="text-primary">{{ current_class_obj.name }}</span>
             {% endif %}
         </div>
 
         <form class="d-flex gap-2" method="get">
-            <input type="date" name="date" class="form-control form-control-sm" value="{{ current_date }}" style="width: 150px;">
+            <input type="date" name="date" class="form-control form-control-sm" value="{{ current_date }}"
+                   style="width: 150px;">
 
             {% if current_user.role.name == 'ADMIN' %}
             <select name="class_id" class="form-select form-select-sm" style="width: 200px;">
                 <option value="all">-- Toàn trường --</option>
                 {% for c in classes %}
-                <option value="{{ c.id }}" {% if current_class_obj and current_class_obj.id == c.id %}selected{% endif %}>
+                <option value="{{ c.id }}" {% if current_class_obj and current_class_obj.id== c.id %}selected{% endif
+                        %}>
                     {{ c.name }}
                 </option>
                 {% endfor %}
@@ -89,11 +91,11 @@
                         <h4 class="mb-0 fw-bold">{{ data.absent_total }} Bé</h4>
 
                         {% if data.absent_permission > 0 %}
-                            <small class="text-muted fst-italic" style="font-size: 0.85rem;">
-                                (Có phép: <span class="fw-bold text-success">{{ data.absent_permission }}</span>)
-                            </small>
+                        <small class="text-muted fst-italic" style="font-size: 0.85rem;">
+                            (Có phép: <span class="fw-bold text-success">{{ data.absent_permission }}</span>)
+                        </small>
                         {% else %}
-                            <small class="text-muted" style="font-size: 0.85rem;">(Không có phép)</small>
+                        <small class="text-muted" style="font-size: 0.85rem;">(Không có phép)</small>
                         {% endif %}
                     </div>
                 </div>
@@ -128,25 +130,25 @@
                 <div class="card-body p-0">
                     <ul class="list-group list-group-flush">
                         {% if data.debtors %}
-                            {% for r in data.debtors %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center py-3">
-                                <div>
-                                    <span class="fw-bold text-dark">{{ loop.index }}. {{ r.student.name }}</span>
-                                    <br>
-                                    <small class="text-muted">
-                                        <i class="fa-solid fa-user-group"></i> PH: {{ r.student.parent_name }}
-                                    </small>
-                                </div>
-                                <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-2">
+                        {% for r in data.debtors %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <span class="fw-bold text-dark">{{ loop.index }}. {{ r.student.name }}</span>
+                                <br>
+                                <small class="text-muted">
+                                    <i class="fa-solid fa-user-group"></i> PH: {{ r.student.parent_name }}
+                                </small>
+                            </div>
+                            <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-2">
                                     Nợ: {{ "{:,.0f}".format(r.total_due - r.paid_amount) }}đ
                                 </span>
-                            </li>
-                            {% endfor %}
+                        </li>
+                        {% endfor %}
                         {% else %}
-                            <div class="text-center py-5">
-                                <i class="fa-solid fa-medal fa-3x text-warning mb-3"></i>
-                                <p class="text-muted">Tuyệt vời! Lớp này đã hoàn thành 100% học phí.</p>
-                            </div>
+                        <div class="text-center py-5">
+                            <i class="fa-solid fa-medal fa-3x text-warning mb-3"></i>
+                            <p class="text-muted">Tuyệt vời! Lớp này đã hoàn thành 100% học phí.</p>
+                        </div>
                         {% endif %}
                     </ul>
                 </div>
@@ -155,20 +157,38 @@
     </div>
 
     <div class="row g-3 mt-1 mb-5">
-         <div class="col-md-6">
+        <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white fw-bold py-3">
                     <i class="fa-solid fa-users me-2 text-info"></i>
                     Sĩ Số Hiện Tại / Chỉ Tiêu
                 </div>
                 <div class="card-body">
-                    {% set max_student = settings['MAX_STUDENT'] | int if settings and settings.get('MAX_STUDENT') else 30 %}
+                    {% set class_limit = settings['MAX_STUDENT'] | int if settings and settings.get('MAX_STUDENT') else
+                    30 %}
 
-                    {% set percent = (data.total_students / max_student * 100) | round %}
+                    {% if current_class_obj %}
+                    {% set target_count = class_limit %}
+                    {% set label_text = "Học Sinh (Max)" %}
+                    {% set info_text = "Dựa trên quy định sĩ số tối đa của lớp (" ~ class_limit ~ " trẻ)." %}
+                    {% else %}
+                    {% set total_classes = classes | length %}
+                    {% set target_count = class_limit * total_classes %}
+
+                    {% set label_text = "Tổng Chỉ Tiêu" %}
+                    {% set info_text = "Tổng sức chứa hiện tại của " ~ total_classes ~ " lớp học (" ~ class_limit ~ "
+                    trẻ/lớp)." %}
+                    {% endif %}
+
+                    {% if target_count > 0 %}
+                    {% set percent = (data.total_students / target_count * 100) | round %}
+                    {% else %}
+                    {% set percent = 0 %}
+                    {% endif %}
 
                     <div class="d-flex justify-content-between mb-2">
                         <span class="fw-bold text-primary">{{ data.total_students }} Bé</span>
-                        <span class="text-muted">{{ max_student }} Học Sinh (Max)</span>
+                        <span class="text-muted">{{ target_count }} {{ label_text }}</span>
                     </div>
 
                     <div class="progress" style="height: 25px;">
@@ -176,12 +196,12 @@
                              role="progressbar"
                              style="width: {{ percent }}%;"
                              aria-valuenow="{{ percent }}" aria-valuemin="0" aria-valuemax="100">
-                             {{ percent }}%
+                            {{ percent }}%
                         </div>
                     </div>
                     <small class="text-muted mt-3 d-block">
                         <i class="fa-solid fa-circle-info"></i>
-                        Dựa trên quy định sĩ số tối đa của lớp ({{ max_student }} trẻ).
+                        {{ info_text }}
                     </small>
                 </div>
             </div>
