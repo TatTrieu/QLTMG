@@ -326,9 +326,9 @@ def get_settings():
     return {r.key: r.value for r in regs}
 
 
-def update_settings(config_data):
+def update_settings(config_data, user_id=None):
     """
-    Trả về: (True/False, Message)
+    Cập nhật quy định hệ thống và lưu ID người sửa.
     """
     warning_msg = ""
     try:
@@ -336,23 +336,23 @@ def update_settings(config_data):
             reg = Regulation.query.filter_by(key=key).first()
             if reg:
                 reg.value = float(value)
+                # [CẬP NHẬT] Lưu dấu vết người sửa (nếu có truyền vào)
+                if user_id:
+                    reg.user_id = user_id
 
         db.session.commit()
 
-        # [MỚI] SAU KHI LƯU, KIỂM TRA LẠI CÁC LỚP
+        # Logic kiểm tra cảnh báo sĩ số (Giữ nguyên như cũ)
         if 'MAX_STUDENT' in config_data:
             new_max = float(config_data['MAX_STUDENT'])
-
-            # Tìm các lớp có sĩ số > new_max
             overloaded_classes = db.session.query(ClassRoom.name) \
                 .join(Student).filter(Student.active == True) \
                 .group_by(ClassRoom.id) \
                 .having(func.count(Student.id) > new_max).all()
 
             if overloaded_classes:
-                # Tạo danh sách tên lớp: "Mầm 1, Chồi 2..."
                 names = ", ".join([c[0] for c in overloaded_classes])
-                warning_msg = f" | CẢNH BÁO: Các lớp ({names}) hiện đang vượt quá quy định mới ({int(new_max)} em). Vui lòng chuyển bớt học sinh!"
+                warning_msg = f" | CẢNH BÁO: Các lớp ({names}) hiện đang vượt quá quy định mới ({int(new_max)} em)!"
 
         return True, "Đã cập nhật cấu hình thành công!" + warning_msg
 
@@ -491,15 +491,18 @@ def load_notifications():
     return Notification.query.filter(Notification.active == True)\
                              .order_by(Notification.created_date.desc()).all()
 
-def add_notification(title, content):
-    """Thêm thông báo mới"""
+def add_notification(title, content, user_id=None):
+    """
+    Thêm thông báo mới có lưu ID người tạo.
+    """
     try:
-        n = Notification(title=title, content=content)
+        # [CẬP NHẬT] Thêm tham số user_id vào model
+        n = Notification(title=title, content=content, user_id=user_id)
         db.session.add(n)
         db.session.commit()
         return True
     except Exception as ex:
-        print(ex)
+        print(f"Lỗi thêm thông báo: {ex}")
         return False
 
 def delete_notification(notify_id):

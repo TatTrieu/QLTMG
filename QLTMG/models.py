@@ -37,10 +37,11 @@ class Regulation(db.Model):
     value = Column(Float, default=0)
     description = Column(String(200))
 
+    # [MỚI] Lưu ID người sửa đổi cuối cùng (Audit Trail)
+    user_id = Column(Integer, ForeignKey('user.id'), nullable=True)
 
-# class ClassRoom(Base):
-#     __tablename__ = 'classroom'
-#     students = relationship('Student', backref='classroom', lazy=True)
+    # Tạo quan hệ để truy vấn: regulation.user.name (để biết ai sửa)
+    user = relationship('User', backref='regulations', lazy=True)
 
 
 class ClassRoom(Base):
@@ -104,10 +105,16 @@ class Notification(db.Model):
     __tablename__ = 'notification'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(String(255), nullable=False)  # Tiêu đề thông báo
-    content = Column(Text, nullable=True)  # Nội dung chi tiết
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=True)
     created_date = Column(DateTime, default=datetime.now)
-    active = Column(Boolean, default=True)  # True: Hiện, False: Ẩn/Xóa
+    active = Column(Boolean, default=True)
+
+    # [MỚI] Lưu ID người đăng thông báo
+    user_id = Column(Integer, ForeignKey('user.id'), nullable=True)
+
+    # Tạo quan hệ để truy vấn: notification.creator.name (để biết ai đăng)
+    creator = relationship('User', backref='notifications', lazy=True)
 
     def __str__(self):
         return self.title

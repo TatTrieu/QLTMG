@@ -152,7 +152,7 @@ def index():
 # --- XỬ LÝ THÊM THÔNG BÁO ---
 @app.route("/notifications/add", methods=["POST"])
 @login_required
-def add_notification_process():  # <--- SỬA TÊN HÀM Ở ĐÂY
+def add_notification_process():
     # Kiểm tra quyền Admin
     if current_user.role.name != 'ADMIN':
         return redirect(url_for('index', err_msg="Truy cập bị từ chối!"))
@@ -160,8 +160,8 @@ def add_notification_process():  # <--- SỬA TÊN HÀM Ở ĐÂY
     title = request.form.get('title')
     content = request.form.get('content')
 
-    # Gọi hàm trong DAO (tên hàm trong DAO vẫn giữ nguyên là add_notification)
-    if dao.add_notification(title, content):
+    # [CẬP NHẬT] Truyền thêm current_user.id vào hàm DAO
+    if dao.add_notification(title, content, user_id=current_user.id):
         return redirect(url_for('index'))
     else:
         return redirect(url_for('index', err_msg="Lỗi hệ thống!"))
@@ -432,9 +432,12 @@ def update_health_process():
 @app.route("/tuition", methods=['GET'])
 @login_required
 def tuition():
-    # ---------------------------------------------------------
-    # 1. XỬ LÝ DANH SÁCH THÁNG (Lấy từ Database)
-    # ---------------------------------------------------------
+    # --- [MỚI] Lấy thông báo từ URL (do hàm update gửi về) ---
+    msg = request.args.get('msg')
+    err_msg = request.args.get('err_msg')
+    # --------------------------------------------------------
+
+    # 1. XỬ LÝ DANH SÁCH THÁNG
     existing_months_query = db.session.query(Receipt.month).distinct().all()
     month_list = [m[0] for m in existing_months_query]
 
@@ -443,9 +446,7 @@ def tuition():
     except:
         pass
 
-    # ---------------------------------------------------------
     # 2. XỬ LÝ THÁNG ĐANG CHỌN
-    # ---------------------------------------------------------
     month_str = request.args.get('month')
     class_id = request.args.get('class_id')
 
@@ -465,9 +466,7 @@ def tuition():
         prev_month = (curr_date - relativedelta(months=1)).strftime('%m/%Y')
         next_month = (curr_date + relativedelta(months=1)).strftime('%m/%Y')
 
-    # ---------------------------------------------------------
-    # 3. XỬ LÝ PHÂN QUYỀN (Admin/Giáo viên)
-    # ---------------------------------------------------------
+    # 3. XỬ LÝ PHÂN QUYỀN
     current_class_obj = None
     if current_user.role == UserRole.TEACHER:
         my_class = ClassRoom.query.filter_by(teacher_id=current_user.id).first()
@@ -480,24 +479,16 @@ def tuition():
         if class_id and class_id != 'all':
             current_class_obj = ClassRoom.query.get(class_id)
 
-    # =========================================================
-    # [MỚI] TỰ ĐỘNG TÍNH LẠI TIỀN ĂN THEO ĐIỂM DANH
-    # =========================================================
-    # Gọi hàm này TRƯỚC khi lấy dữ liệu hiển thị
+    # [AUTO UPDATE] Tự động tính lại tiền ăn theo điểm danh
     if month_str:
          dao.auto_update_tuition_from_attendance(month_str, class_id)
-    # =========================================================
 
-    # ---------------------------------------------------------
     # 4. LẤY DỮ LIỆU ĐỂ HIỂN THỊ
-    # ---------------------------------------------------------
-    # Lấy đơn giá
     reg_tuition = Regulation.query.filter_by(key='BASE_TUITION').first()
     reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first()
     base_price = reg_tuition.value if reg_tuition else 0
     meal_price = reg_meal.value if reg_meal else 0
 
-    # Lấy danh sách học sinh
     query = Student.query.filter(Student.active == True)
     if class_id and class_id != 'all' and class_id != -1:
         query = query.filter_by(class_id=class_id)
@@ -505,7 +496,6 @@ def tuition():
         query = query.filter(Student.id == -1)
     students = query.all()
 
-    # Tính toán hiển thị
     data_list = []
     total_summary = {'meal_total': 0, 'discount': 0, 'total_due': 0, 'paid': 0, 'debt': 0}
 
@@ -515,12 +505,10 @@ def tuition():
                 'base_tuition': base_price, 'meal_price': meal_price}
 
         if receipt:
-            # Dữ liệu lấy từ Database (đã được auto_update cập nhật ở trên)
             item.update({'meal_days': receipt.meal_days, 'meal_total': receipt.meal_total,
                          'discount': receipt.discount, 'total_due': receipt.total_due,
                          'paid_amount': receipt.paid_amount, 'is_saved': True})
         else:
-            # Chưa tạo dữ liệu -> Hiển thị mặc định
             default_days = 22
             meal_total_calc = default_days * meal_price
             item.update({'meal_days': default_days, 'meal_total': meal_total_calc,
@@ -529,7 +517,6 @@ def tuition():
 
         item['debt'] = item['total_due'] - item['paid_amount']
 
-        # Cộng dồn tổng
         total_summary['meal_total'] += item['meal_total']
         total_summary['discount'] += item['discount']
         total_summary['total_due'] += item['total_due']
@@ -549,7 +536,9 @@ def tuition():
                            prev_month=prev_month,
                            month_list=month_list,
                            current_class_id=str(class_id) if class_id else None,
-                           current_class_obj=current_class_obj)
+                           current_class_obj=current_class_obj,
+                           msg=msg,          # <--- Đã thêm biến này
+                           err_msg=err_msg)  # <--- Đã thêm biến này
 
 # --- ROUTE MỚI: KHỞI TẠO DỮ LIỆU THÁNG ---
 @app.route("/tuition/init", methods=['POST'])
@@ -606,31 +595,67 @@ def init_tuition_data():
 @app.route("/tuition/update-single", methods=['POST'])
 @login_required
 def update_single_tuition():
-    # 1. Lấy dữ liệu từ Modal gửi về
+    # 1. Lấy dữ liệu cơ bản
     student_id = request.form.get('student_id')
     month = request.form.get('month')
 
-    # Các chỉ số nhập liệu
-    meal_days = float(request.form.get('meal_days', 22))
-    discount = float(request.form.get('discount', 0))
-    paid_amount = float(request.form.get('paid_amount', 0))
+    # Lấy class_id để khi redirect về đúng trang lớp đó (UX tốt hơn)
+    # Vì form modal của bạn có thể không gửi class_id, ta sẽ lấy student để tìm class nếu cần
+    # Tuy nhiên, đơn giản nhất là redirect về tuition với month, user sẽ tự lọc lại.
 
-    # 2. Lấy đơn giá quy định
+    # --- HÀM PHỤ: Xử lý chuỗi rỗng thành 0.0 ---
+    def safe_float(value):
+        if not value or value.strip() == '':
+            return 0.0
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
+
+    # -------------------------------------------
+
+    # 2. Lấy giá trị từ Form (Dùng safe_float để không bị crash)
+    meal_days = safe_float(request.form.get('meal_days'))
+    discount = safe_float(request.form.get('discount'))
+    paid_amount = safe_float(request.form.get('paid_amount'))
+
+    # 3. Lấy đơn giá quy định
     reg_tuition = Regulation.query.filter_by(key='BASE_TUITION').first()
     reg_meal = Regulation.query.filter_by(key='MEAL_PRICE').first()
     base_price = reg_tuition.value if reg_tuition else 0
     meal_price = reg_meal.value if reg_meal else 0
 
-    # 3. Tính toán
+    # 4. Tính toán TỔNG CẦN THU (Total Due) trước
     meal_total = meal_days * meal_price
     total_due = base_price + meal_total - discount
+
+    # --- [QUAN TRỌNG] LOGIC KIỂM TRA HỢP LỆ ---
+
+    # Kiểm tra số âm
+    if paid_amount < 0:
+        return redirect(url_for('tuition', month=month, err_msg="Lỗi: Số tiền đã đóng không được âm!"))
+    if discount < 0:
+        return redirect(url_for('tuition', month=month, err_msg="Lỗi: Số tiền miễn giảm không được âm!"))
+    if meal_days < 0:
+        return redirect(url_for('tuition', month=month, err_msg="Lỗi: Số ngày ăn không được âm!"))
+
+    # Kiểm tra đóng thừa tiền (Đóng > Phải thu)
+    # Dùng round để tránh lỗi so sánh số thực nhỏ (vd: 0.0000001)
+    if round(paid_amount) > round(total_due):
+        str_paid = "{:,.0f}".format(paid_amount)
+        str_due = "{:,.0f}".format(total_due)
+        return redirect(url_for('tuition', month=month,
+                                err_msg=f"Lỗi: Số tiền đóng ({str_paid}) không được lớn hơn số phải thu ({str_due})!"))
+
+    # ------------------------------------------
+
+    # 5. Lưu vào Database
     is_finished = (total_due - paid_amount) <= 0
 
-    # 4. Lưu vào Database
     receipt = Receipt.query.filter_by(student_id=student_id, month=month).first()
 
     if receipt:
-        # Cập nhật
+        # Update
         receipt.meal_days = meal_days
         receipt.meal_total = meal_total
         receipt.discount = discount
@@ -639,7 +664,7 @@ def update_single_tuition():
         receipt.status = is_finished
         receipt.user_id = current_user.id
     else:
-        # Tạo mới
+        # Create
         new_receipt = Receipt(
             student_id=student_id,
             month=month,
@@ -656,13 +681,14 @@ def update_single_tuition():
 
     db.session.commit()
 
-    # Load lại trang cũ
-    return redirect(request.referrer)
+    # Load lại trang và thông báo thành công
+    return redirect(url_for('tuition', month=month, msg="Cập nhật thành công!"))
 
 
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings_process():
+    # Kiểm tra quyền Admin
     if current_user.role.name != 'ADMIN':
         return redirect(url_for('index', err_msg="Truy cập bị từ chối!"))
 
@@ -676,11 +702,11 @@ def settings_process():
             'MEAL_PRICE': request.form.get('meal_price')
         }
 
-        # [MỚI] GỌI HÀM SETTINGS VÀ NHẬN THÔNG BÁO CẢNH BÁO (NẾU CÓ)
-        success, message = dao.update_settings(data)
+        # [CẬP NHẬT] Truyền thêm current_user.id để lưu vết người sửa
+        success, message = dao.update_settings(data, user_id=current_user.id)
 
         if success:
-            msg = message  # Hiển thị thành công kèm cảnh báo (nếu có)
+            msg = message
         else:
             err_msg = message
 
