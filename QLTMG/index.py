@@ -1,3 +1,4 @@
+import os
 from flask import render_template, request, redirect, url_for, session
 from flask_login import login_user, logout_user, login_required, current_user
 import dao
@@ -15,7 +16,15 @@ from docx import Document
 from docx.shared import Pt, Inches, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dateutil.relativedelta import relativedelta
+import cloudinary
+import cloudinary.uploader
 
+# Lấy cấu hình từ Biến môi trường (Environment Variables)
+cloudinary.config(
+    cloud_name="dobee9dlb",
+    api_key="158475847337887",
+    api_secret="mKOhHPjUCnq8HczpUop3mfNFwaw"
+)
 
 login.login_view = 'login_process'
 
@@ -76,32 +85,52 @@ def logout_process():
 @app.route("/register", methods=['GET', 'POST'])
 @login_required
 def register_process():
-    # Kiểm tra quyền Admin
+    # Chỉ Admin mới được tạo tài khoản
     if current_user.role.name != 'ADMIN':
         return redirect(url_for('index', err_msg="Bạn không có quyền tạo tài khoản!"))
 
     err_msg = ""
+    msg = ""
+
     if request.method == 'POST':
+        name = request.form.get("name")
+        username = request.form.get("username")
         password = request.form.get('password')
         confirm = request.form.get('confirm')
+        email = request.form.get("email")
 
+        # 1. XỬ LÝ UPLOAD AVATAR
+        avatar_url = None  # Mặc định là None để hàm add_user tự lấy ảnh mặc định
+
+        if 'avatar' in request.files:
+            file = request.files['avatar']
+            if file and file.filename != '':
+                try:
+                    # Upload lên Cloudinary
+                    upload_result = cloudinary.uploader.upload(file)
+                    avatar_url = upload_result['secure_url']
+                except Exception as ex:
+                    print(f"Lỗi upload ảnh: {ex}")
+                    err_msg = "Lỗi: Không thể tải ảnh lên hệ thống!"
+                    return render_template('register.html', err_msg=err_msg)
+
+        # 2. KIỂM TRA MẬT KHẨU
         if password == confirm:
-            # Gọi hàm add_user và kiểm tra kết quả (True/False)
-            if dao.add_user(name=request.form.get("name"),
-                            username=request.form.get("username"),
+            # Gọi hàm add_user (Nếu avatar_url là None thì hàm DAO sẽ tự gán ảnh mặc định)
+            if dao.add_user(name=name,
+                            username=username,
                             password=password,
-                            email=request.form.get("email"),
-                            avatar=request.form.get("avatar")):
+                            email=email,
+                            avatar=avatar_url):  # Truyền link ảnh (hoặc None)
 
                 # Thành công -> Về trang chủ
                 return redirect(url_for('index', msg="Tạo tài khoản thành công!"))
             else:
-                # Thất bại -> Báo lỗi
                 err_msg = "Lỗi! Tên đăng nhập hoặc Email đã tồn tại."
         else:
             err_msg = "Mật khẩu xác nhận không khớp!"
 
-    return render_template('register.html', err_msg=err_msg)
+    return render_template('register.html', err_msg=err_msg, msg=msg)
 
 
 @app.route("/")
@@ -196,28 +225,36 @@ def add_student_process():
     if current_user.role != UserRole.ADMIN:
         return redirect(url_for('students', err_msg="Bạn không có quyền thực hiện chức năng này!"))
 
-    # 1. Lấy dữ liệu từ form
+    # 1. Lấy dữ liệu văn bản
     name = request.form.get("name")
     birth_date = request.form.get("birth_date")
     gender = request.form.get("gender")
     parent_name = request.form.get("parent_name")
     phone = request.form.get("phone")
     class_id = request.form.get("class_id")
-    avatar = request.form.get("avatar")
 
-    # --- [VALIDATION] KIỂM TRA SỐ ĐIỆN THOẠI ---
+    # 2. XỬ LÝ UPLOAD ẢNH (Thay vì lấy URL text)
+    avatar_url = None
+    if 'avatar' in request.files:
+        file = request.files['avatar']
+        if file and file.filename != '':
+            try:
+                # Upload lên Cloudinary
+                upload_result = cloudinary.uploader.upload(file)
+                avatar_url = upload_result['secure_url']
+            except Exception as ex:
+                print(f"Lỗi upload ảnh: {ex}")
+                return redirect(url_for('students', err_msg="Lỗi: Không thể tải ảnh lên hệ thống!"))
+
+    # 3. Validate Số điện thoại
     if phone:
-        # Kiểm tra xem có ký tự nào không phải là số không
         if not phone.isdigit():
-            return redirect(url_for('students', err_msg="Lỗi: Số điện thoại chỉ được chứa ký tự số!"))
-
-        # (Tùy chọn) Kiểm tra độ dài, ví dụ SĐT Việt Nam thường 10 số
+             return redirect(url_for('students', err_msg="Lỗi: Số điện thoại chỉ được chứa ký tự số!"))
         if len(phone) < 9 or len(phone) > 11:
-            return redirect(url_for('students', err_msg="Lỗi: Số điện thoại phải từ 9-11 số!"))
-    # -------------------------------------------
+             return redirect(url_for('students', err_msg="Lỗi: Số điện thoại phải từ 9-11 số!"))
 
-    # 2. Gọi DAO để thêm
-    success, message = dao.add_student(name, birth_date, gender, parent_name, phone, class_id, avatar, current_user.id)
+    # 4. Gọi DAO để lưu
+    success, message = dao.add_student(name, birth_date, gender, parent_name, phone, class_id, avatar_url, current_user.id)
 
     if success:
         return redirect(url_for('students', msg=message))
@@ -282,7 +319,7 @@ def delete_student_process(student_id):
 @app.route("/students/update", methods=["POST"])
 @login_required
 def update_student_process():
-    # 1. Lấy dữ liệu từ form
+    # 1. Lấy dữ liệu
     student_id = request.form.get("student_id")
     name = request.form.get("name")
     birth_date = request.form.get("birth_date")
@@ -290,23 +327,30 @@ def update_student_process():
     parent_name = request.form.get("parent_name")
     phone = request.form.get("phone")
     class_id = request.form.get("class_id")
-    avatar = request.form.get("avatar")
 
-    # --- [VALIDATION] KIỂM TRA SỐ ĐIỆN THOẠI (SỬA LẠI ĐOẠN NÀY) ---
+    # 2. XỬ LÝ UPLOAD ẢNH (Update)
+    avatar_url = None
+    if 'avatar' in request.files:
+        file = request.files['avatar']
+        if file and file.filename != '':
+            try:
+                upload_result = cloudinary.uploader.upload(file)
+                avatar_url = upload_result['secure_url']
+            except Exception as ex:
+                print(f"Lỗi upload ảnh: {ex}")
+                return redirect(url_for('students', err_msg="Lỗi: Không thể tải ảnh lên hệ thống!"))
+
+    # 3. Validate SĐT
     if phone:
-        # 1. Kiểm tra phải là số
         if not phone.isdigit():
             return redirect(url_for('students', err_msg="Lỗi: Số điện thoại chỉ được chứa ký tự số!"))
-
-        # 2. Kiểm tra độ dài (9 - 11 số) --> BỔ SUNG DÒNG NÀY
         if len(phone) < 9 or len(phone) > 11:
             return redirect(url_for('students', err_msg="Lỗi: Số điện thoại phải từ 9 đến 11 số!"))
-    # --------------------------------------------------------------
 
-    # 2. Gọi hàm update (Lưu ý: Code dưới đây hỗ trợ cả trường hợp DAO trả về True/False hoặc Tuple)
-    result = dao.update_student(student_id, name, birth_date, gender, parent_name, phone, class_id, avatar)
+    # 4. Gọi DAO cập nhật
+    result = dao.update_student(student_id, name, birth_date, gender, parent_name, phone, class_id, avatar_url)
 
-    # Kiểm tra kết quả trả về (để tương thích với code cũ hay mới của bạn)
+    # Xử lý kết quả trả về từ DAO (Tuple hoặc Boolean)
     if isinstance(result, tuple):
         success, message = result
     else:
@@ -651,48 +695,65 @@ def profile():
     msg = ""
 
     if request.method == 'POST':
+        # 1. Lấy thông tin cơ bản
         name = request.form.get('name')
         email = request.form.get('email')
-        avatar = request.form.get('avatar')
 
-        # Lấy thông tin mật khẩu từ form
+        # 2. XỬ LÝ UPLOAD ẢNH (Thay thế hoàn toàn logic nhập URL cũ)
+        avatar_url = None  # Mặc định là None (nghĩa là không đổi ảnh)
+
+        if 'avatar' in request.files:
+            file = request.files['avatar']
+            # Chỉ xử lý nếu người dùng có chọn file
+            if file and file.filename != '':
+                try:
+                    # Upload lên Cloudinary
+                    upload_result = cloudinary.uploader.upload(file)
+                    # Lấy đường dẫn ảnh trả về
+                    avatar_url = upload_result['secure_url']
+                except Exception as e:
+                    print(f"Lỗi Cloudinary: {e}")
+                    # QUAN TRỌNG: Nếu lỗi upload thì dừng ngay, không lưu DB
+                    return render_template('profile.html',
+                                           err_msg="Lỗi: Không thể tải ảnh lên (Vui lòng kiểm tra kết nối mạng hoặc API Key)!",
+                                           msg="")
+
+        # 3. Lấy thông tin mật khẩu
         old_password = request.form.get('old_password')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
 
-        # --- LOGIC KIỂM TRA BẢO MẬT ---
-        # Kiểm tra xem người dùng có đang cố thay đổi Email hoặc Mật khẩu không
-        is_changing_sensitive_data = False
+        # 4. LOGIC KIỂM TRA BẢO MẬT (Xác minh mật khẩu cũ)
+        # Người dùng phải nhập mật khẩu cũ KHI:
+        # - Có thay đổi Email
+        # - Hoặc Có nhập mật khẩu mới
+        is_sensitive_change = False
 
-        # 1. Nếu Email thay đổi khác với Email hiện tại
         if email and email.strip() != (current_user.email or ""):
-            is_changing_sensitive_data = True
+            is_sensitive_change = True
 
-        # 2. Hoặc nếu có nhập mật khẩu mới
         if new_password:
-            is_changing_sensitive_data = True
+            is_sensitive_change = True
             if new_password != confirm_password:
-                err_msg = "Mật khẩu mới và xác nhận không khớp!"
-                return render_template('profile.html', err_msg=err_msg, msg=msg)
+                return render_template('profile.html', err_msg="Mật khẩu mới và xác nhận không khớp!", msg="")
 
-        # NẾU CÓ THAY ĐỔI NHẠY CẢM -> BẮT BUỘC XÁC MINH MẬT KHẨU CŨ
-        if is_changing_sensitive_data:
+        if is_sensitive_change:
             if not old_password:
-                err_msg = "Vui lòng nhập mật khẩu hiện tại để xác nhận thay đổi!"
-                return render_template('profile.html', err_msg=err_msg, msg=msg)
+                return render_template('profile.html',
+                                       err_msg="Vui lòng nhập mật khẩu hiện tại để xác nhận thay đổi quan trọng!",
+                                       msg="")
 
-            # Mã hóa mật khẩu cũ nhập vào để so sánh với DB
+            # Kiểm tra mật khẩu cũ có đúng không
             hashed_old_pass = hashlib.md5(old_password.strip().encode('utf-8')).hexdigest()
-
             if hashed_old_pass != current_user.password:
-                err_msg = "Mật khẩu hiện tại không đúng!"
-                return render_template('profile.html', err_msg=err_msg, msg=msg)
+                return render_template('profile.html', err_msg="Mật khẩu hiện tại không đúng!", msg="")
 
-        # --- GỌI DAO ĐỂ LƯU ---
-        if dao.update_user_profile(current_user.id, name, email, avatar, new_password):
+        # 5. GỌI DAO ĐỂ LƯU VÀO DATABASE
+        # Truyền avatar_url (Nếu là None thì DAO sẽ giữ nguyên ảnh cũ)
+        if dao.update_user_profile(current_user.id, name, email, avatar_url, new_password):
             msg = "Cập nhật hồ sơ thành công!"
         else:
-            err_msg = "Lỗi! Email này có thể đã được sử dụng."
+            err_msg = "Lỗi! Email này có thể đã được sử dụng bởi người khác."
 
     return render_template('profile.html', err_msg=err_msg, msg=msg)
 
